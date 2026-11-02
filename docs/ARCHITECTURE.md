@@ -205,3 +205,22 @@ POST /qa
   └─ QAService.answer ─ search(hybrid_rerank) ─ sanitize ─ 证据阈值 ─ mock 抽取 / LLM(<untrusted_document>) ─ 引用校验
 ```
 详细设计、参数理由与验收标准见 [STAGE2_DESIGN.md](STAGE2_DESIGN.md)。
+
+## 8. 阶段 2.5 增量：模型调用层与多模型索引
+
+```
+            ┌───────────────────────── ModelGateway（llm/gateway.py）─────────────────────────┐
+请求 ──►  │ provider 选择：mock │ local(CPU, sentence-transformers) │ openai_compatible(百炼/Qwen) │
+            │ 付费守卫：ALLOW_PAID_API + APPROVAL_ID + 价格表 + 事前估算 + 硬上限 + JSONL 账本 + 脱敏 │
+            └───────────────┬──────────────────────────────────────────────┬──────────────────┘
+                            ▼                                              ▼
+      embedding_models / chunk_embeddings（每模型独立部分 HNSW）      Reranker：rule │ mock │ cross_encoder
+                            ▼                                              ▼
+       RetrievalService：vector │ keyword │ hybrid(RRF) │ hybrid+rerank（重排名次再与融合名次 RRF）
+                            ▼
+       QAService：证据阈值（lexical 或 reranker）+ anchor 检查 → 生成 → 输出策略检查（链接白名单/泄漏/动作声明）+ 引用校验
+```
+
+- 免费本地模型只在安装 `--group local-embed` 时可用；未安装/未缓存时抛 `LocalModelUnavailable`，检索自动降级为关键词并标记 `degraded`。
+- 付费路径默认关闭，任何一道守卫不满足都在**发请求前**拒绝；详见 [付费实验方案](STAGE2_5_PAID_EMBED_PLAN.md)。
+- 阶段 3 Agent 设计见 [STAGE3_DESIGN.md](STAGE3_DESIGN.md)。

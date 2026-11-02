@@ -3,17 +3,18 @@
 > Production-oriented AI Support & Ticket Resolution Platform
 > 面向软件企业技术支持 / 研发 / 客服团队的智能技术支持 Agent 平台：查文档、查日志、给出有出处的故障建议、生成待审工单，人工审批后才落库。
 
-**当前进度：第二阶段（企业知识库 RAG）已完成，在 WSL2 + Docker Compose 上实测（tag `stage-2`）** —— 详见 [docs/PROGRESS.md](docs/PROGRESS.md)、[阶段 2 设计](docs/STAGE2_DESIGN.md)、[阶段 2 报告](docs/reports/STAGE2_REPORT.md)、[检索评测报告](docs/reports/STAGE2_EVAL.md)。
+**当前进度：阶段 2.5（真实免费本地 Embedding + 混合检索评测）已完成，在 WSL2 + Docker Compose 上实测（tag `stage-2.5`）** —— 详见 [docs/PROGRESS.md](docs/PROGRESS.md)、[阶段 2.5 报告](docs/reports/STAGE2_5_REPORT.md)、[阶段 2.5 评测](docs/reports/STAGE2_5_EVAL.md)、[阶段 3 设计](docs/STAGE3_DESIGN.md)。
 Agent、MCP、工单审批尚未实现（第三、四阶段）。README 只写已经验证过的内容。
 
-> ⚠️ 默认 **Mock 模式**：mock embedding 是特征哈希的字/词袋向量，**没有语义理解**；mock 回答器是**抽取式**的（摘录原文 + 引用），**没有调用大模型**。界面和接口都明确标注了这一点。真实 DashScope 路径已实现但需要显式开关，尚未运行。
+> ⚠️ 默认 **Mock 模式**：mock embedding 是特征哈希的字/词袋向量，**没有语义理解**；mock 回答器是**抽取式**的（摘录原文 + 引用），**没有调用大模型**。界面和接口都明确标注了这一点。阶段 2.5 起可选**免费本地 CPU 模型**（bge-small-zh-v1.5 / bge-m3 embedding、bge-reranker-base 重排），已实测；真实 DashScope / Qwen 付费路径有多重守卫，**尚未运行**（[方案待批准](docs/STAGE2_5_PAID_EMBED_PLAN.md)）。
 
-![检索调试页：四种检索模式并排对比（WSL2 实测，Windows Edge 截图）](docs/assets/stage2-search-debug.png)
+![评测页：Mock vs 真实 Embedding 并排对比（WSL2 实测，Windows Edge 截图）](docs/assets/stage25-evals-matrix.png)
 
 ## 文档
 - [PRD 需求说明](docs/PRD.md) · [架构说明](docs/ARCHITECTURE.md) · [数据库设计](docs/DATABASE.md) · [API 设计](docs/API.md)
 - [阶段进度](docs/PROGRESS.md) · [阶段 1 报告](docs/reports/STAGE1_REPORT.md) · [阶段 2 设计](docs/STAGE2_DESIGN.md) · [阶段 2 报告](docs/reports/STAGE2_REPORT.md) · [检索评测报告](docs/reports/STAGE2_EVAL.md)
-- [RAG 流程 Notebook（中文，含输出）](notebooks/rag_walkthrough.ipynb)
+- [阶段 2.5 报告](docs/reports/STAGE2_5_REPORT.md) · [阶段 2.5 评测](docs/reports/STAGE2_5_EVAL.md) · [评测汇总表](docs/reports/STAGE2_5_TABLES.md) · [付费 Embedding 对照方案（未执行）](docs/STAGE2_5_PAID_EMBED_PLAN.md) · [阶段 3 设计](docs/STAGE3_DESIGN.md)
+- [RAG 流程 Notebook（中文，含输出）](notebooks/rag_walkthrough.ipynb) · [真实 Embedding / 混合检索 Notebook（中文，含输出）](notebooks/real_embedding_hybrid.ipynb)
 
 ## 技术栈
 FastAPI · Pydantic v2 · SQLAlchemy 2 · Alembic · PostgreSQL + pgvector（HNSW）+ 全文检索（GIN）· jieba · pypdf · LangChain text-splitters · PyJWT + Argon2 · structlog · React 19 + TypeScript + Vite + Tailwind v4 ·
@@ -94,7 +95,9 @@ cd frontend && npm ci && npm run dev      # :5173，需要 Node 22
 ## Mock 模式与真实模型
 默认 `OPSPILOT_LLM_PROVIDER=mock`、`OPSPILOT_EMBEDDING_PROVIDER=mock`：离线、确定性、零费用，测试与 CI 都用它。
 切换 Qwen / DashScope：把两项改为 `openai_compatible`，在 `.env` 中自行填写 `OPSPILOT_LLM_API_KEY`（不要提交），**并且**设置 `OPSPILOT_ALLOW_PAID_API=true`——缺少这个显式开关时，配置加载会直接报错，防止误调用付费接口。
-切换 embedding 模型后，旧向量不会与新模型混用（按 `embedding_model` 过滤），需要对文档执行「重建索引」；真实 embedding 评测：`uv run python evals/run_retrieval_eval.py --embedding real --i-understand-this-costs-money`（会对全部语料重新向量化，产生费用；**阶段 2 未运行**）。
+**免费本地模型（阶段 2.5，CPU，不需要 Key）**：`uv sync --group local-embed`（装 torch CPU 版约 1 GB；注意 `--all-groups` 也会装它），设置 `OPSPILOT_EMBEDDING_PROVIDER=local`（默认 bge-small-zh-v1.5，固定 revision），可选 `OPSPILOT_RERANKER=cross_encoder`（约 2 秒/查询）。首次下载模型后可设 `HF_HUB_OFFLINE=1`。每个 embedding 模型有独立索引，切换模型不会删除或混用旧向量，需对文档「重建索引」。
+本地评测：`uv run --group local-embed python evals/run_retrieval_eval.py --embedding local --dataset dev|heldout --rerankers rule,cross_encoder`。
+**付费路径**（`--embedding dashscope --i-understand-this-costs-money`）另需 `OPSPILOT_ALLOW_PAID_API=true`、`OPSPILOT_PAID_APPROVAL_ID`、`OPSPILOT_PAID_BUDGET_CNY`，超出预算在发请求前拒绝；**尚未运行**。
 
 ## 常用命令
 | 命令 | 作用 |
@@ -109,10 +112,18 @@ cd frontend && npm ci && npm run dev      # :5173，需要 Node 22
 | `make corpus` / `make corpus-docker` | 导入合成语料（宿主 / 容器内） |
 | `make eval` | 四种检索模式评测（mock embedding） |
 | `make notebook` | 重新生成并执行 `notebooks/rag_walkthrough.ipynb` |
+| `uv run python scripts/build_stage25_notebook.py` + nbconvert | 生成并执行 `notebooks/real_embedding_hybrid.ipynb`（需 local-embed 组） |
 
 WSL 内的 Chromium 缺系统库（`libasound2`，需要 sudo），所以作者机器上的 E2E 用 Windows 的无头 Edge 跑：`powershell -File scripts\e2e_windows.ps1 -Shots <截图目录>`。
 
 集成测试使用 `OPSPILOT_TEST_DATABASE_URL`（默认 `opspilot_test` 库），每次会 `downgrade base → upgrade head`，**请勿指向有数据的库**。
+
+## 已实现（阶段 2.5）
+- 免费本地 CPU embedding（bge-small-zh-v1.5 / bge-m3）与真实 cross-encoder 重排，固定 revision；多模型隔离向量索引（每模型部分 HNSW），mock 向量保留
+- 冻结 held-out（37 条）+ dev（55 条）真实评测，Mock 基线并排；前端评测页矩阵与逐条失败分类
+- 修复：改写题误拒、近话题误答（anchor 检查）、重排丢失 multi_doc（RRF 融合）、cross-encoder 双 sigmoid、真实 token 计数；pgvector iterative scan（relaxed_order）
+- 注入防御输出策略层（链接白名单等）+ 服从注入的假 LLM 测试；embedding 故障自动降级关键词
+- 统一模型调用层 ModelGateway：调用计数、token、成本、预算硬上限、账本、密钥脱敏；付费默认关闭
 
 ## 已实现（阶段 2：企业知识库 RAG）
 - 上传 PDF / Markdown / TXT：白名单、大小上限、魔数与扩展名一致性、二进制伪装检测、UTF-8/GB18030 解码；解析错误带错误码与中文说明
