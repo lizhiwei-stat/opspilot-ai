@@ -39,7 +39,7 @@ erDiagram
 |---|---|---|---|
 | `documents` | kb_id, source_name, title, mime_type, status(active/deleted), current_version, uploaded_by | `uq(kb_id, source_name)`；`ix(kb_id)` | 逻辑文档 |
 | `document_versions` | document_id, version, content_sha256, size_bytes, storage_path, index_status(pending/indexing/indexed/failed/**superseded**), error_message, chunk_count, embedding_model | `uq(document_id, version)`；`ix(content_sha256)` | 每次上传一个版本；哈希去重 |
-| `chunks` | kb_id, document_id, document_version_id, chunk_index, content, search_text, **tsv**, **embedding vector(1024)**, page_number, heading_path, char_start, char_end, token_count, is_active | `uq(document_version_id, chunk_index)`；`ix(kb_id,is_active)`；`ix(document_version_id)`、`ix(document_id)`（迁移 0002）；**GIN(tsv)**；**HNSW(embedding vector_cosine_ops, m=16, ef_construction=64)** | 检索单元 |
+| `chunks` | kb_id, document_id, document_version_id, chunk_index, content, search_text, **tsv**, **embedding vector(1024)**, page_number, heading_path, char_start, char_end, char_count（0003 起由 token_count 改名，存字符数）, is_active | `uq(document_version_id, chunk_index)`；`ix(kb_id,is_active)`；`ix(document_version_id)`、`ix(document_id)`（迁移 0002）；**GIN(tsv)**；**HNSW(embedding vector_cosine_ops, m=16, ef_construction=64)** | 检索单元 |
 
 - `tsv` 是生成列：`to_tsvector('simple', search_text)` STORED。`search_text` 由应用写入（中文先分词，以空格连接），见 ARCHITECTURE ADR-02。
 - 可定位位置 = `document.source_name` + `version` + `page_number` / `heading_path` + `char_start..char_end`，引用即由这些列拼成。
@@ -62,7 +62,7 @@ erDiagram
 | `agent_steps` | run_id, seq, node, status(ok/error/skipped/fallback), input_summary, output_summary, tokens, started_at, duration_ms, error | `uq(run_id, seq)` |
 | `tool_calls` | run_id, step_id, tool_name, transport(inprocess/mcp), arguments, result, status(ok/error/timeout/denied/fallback), attempt, error, duration_ms, caller_id | `ix(run_id)`；`ix(tool_name, created_at)` |
 
-LangGraph 自身的 checkpoint 表由 `langgraph-checkpoint-postgres` 的 `setup()` 在阶段 4 创建（不由本迁移管理，避免与库内部 schema 版本冲突）。
+LangGraph 自身的 checkpoint 表由 `langgraph-checkpoint-postgres` 的 `setup()` 在阶段 3 创建（放在独立 `langgraph` schema，见 [STAGE3_DESIGN §8](STAGE3_DESIGN.md)；不由本迁移管理，避免与库内部 schema 版本冲突）。
 
 ### 评测与审计
 | 表 | 主要列 |
@@ -71,11 +71,20 @@ LangGraph 自身的 checkpoint 表由 `langgraph-checkpoint-postgres` 的 `setup
 | `eval_case_results` | eval_run_id, case_id, **label_source(human/synthetic)**, agent_run_id, recall_at_5, task_completed, grounded, tool_success_rate, latency_ms, total_tokens, details；`uq(eval_run_id, case_id)` |
 | `audit_logs` | actor_id, action, resource_type, resource_id, request_id, details；`ix(actor_id, created_at)`、`ix(resource_type, resource_id)` |
 
+### 多模型向量索引（阶段 2.5，迁移 0003）
+| 表 | 主要列 | 约束 / 索引 | 用途 |
+|---|---|---|---|
+| `embedding_models` | id, name(uq), provider(mock/local/openai_compatible), dim, revision, config(JSONB：HF id、pooling、指令、max_length) | `uq(name)` | 每个 embedding 模型一行；同名不同维度注册时报 `EmbeddingDimensionMismatch`（409） |
+| `chunk_embeddings` | chunk_id, model_id, embedding `vector`（不定维）, token_count（该模型 tokenizer 的真实 token 数）, created_at | PK(chunk_id, model_id)；每个模型一个**部分 HNSW 索引** `ix_chunk_emb_hnsw_m{id}`（`WHERE model_id = id`，按该模型维度强转），由应用在首次注册模型时创建，Alembic `include_object` 忽略 | 不同模型的向量物理隔离，切换模型不删除旧向量（mock 向量保留） |
+
+检索时 `JOIN chunk_embeddings ON model_id = 当前模型`，ACL 过滤仍在排序之前；pgvector ≥ 0.8 时会话设置 `hnsw.iterative_scan = relaxed_order`，外层再按距离排序（实验见 STAGE2_5_EVAL §7）。
+
 ## 迁移列表
 | 版本 | 文件 | 内容 |
 |---|---|---|
 | `0001` | `20261102_0001_initial_schema.py` | 扩展 vector + 16 张表、HNSW、GIN、约束 |
 | `0002` | `20261102_0002_rag_indexes_and_superseded_version_.py` | `chunks` 新增 `ix_chunks_document_version_id`、`ix_chunks_document_id`；`document_versions.index_status` CHECK 加入 `superseded`（可降级） |
+| `0003` | `20261102_0003_chunk_embeddings_per_model.py` | 新增 `embedding_models`、`chunk_embeddings`；把 `chunks.embedding` 迁移为 mock 模型的行（不丢数据）；`chunks.token_count → char_count`（可降级） |
 
 ## 迁移操作
 

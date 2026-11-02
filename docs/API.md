@@ -41,6 +41,11 @@ Base URL：`http://localhost:8000`。交互式文档：`/docs`（Swagger）、`/
 | POST | `/api/v1/search` | 登录 | `{query, mode: vector|keyword|hybrid|hybrid_rerank, top_k≤50, kb_ids?}` → `{tokens, candidates[{chunk_id, rank, score, content, document_name, version, kb_slug, page_number, heading_path, char_start, char_end, suspicious, scores{vector,keyword,rrf,rerank}, ranks{…}}], timings_ms, embedding_model, reranker}` |
 | POST | `/api/v1/qa` | 登录 | `{question, top_k≤20, kb_ids?}` → `{answer, generator, is_mock, evidence_sufficient, evidence_score, threshold, citations[{index, chunk_id, document_name, kb_slug, version, page_number, locator, evidence, quote}], flagged_chunks, candidates, timings_ms}` |
 
+阶段 2.5 补充（向后兼容，新增字段）：
+- `/search` 响应新增 `degraded`（`null` 或原因字符串，如 `embedding_unavailable:<异常类型>`、`no_vectors_for_model`：embedding 不可用时自动降级为关键词检索；数据库错误不降级，直接 500）；`reranker` 标明类型（rule / mock / cross-encoder 模型名）；`embedding_model` 为实际使用的隔离索引名。
+- `/qa` 新增 `refusal_reason`（`below_threshold`、`unmatched_anchor:<词>`、`policy_violation`、`no_valid_citation`）、`policy_violations`（`untrusted_*`、`link_not_allowlisted:<host>`、`secret_like_string`、`action_claim`，见 `rag/policy.py`）、`degraded`。
+- `GET /api/v1/evals/runs` 的 `config` 含 `embedding_model / dataset_split / rerank_fusion / qa_profile`，前端据此画 Mock vs 真实并排矩阵。
+
 上传解析错误码：`unsupported_type` `empty_file` `too_large` `content_mismatch` `binary_content` `decode_failed` `pdf_encrypted` `pdf_corrupt` `pdf_no_text` `no_chunks` `embedding_failed`。
 
 🔜 知识库创建 / 授权管理接口（`POST /knowledge-bases`、`PUT/DELETE …/permissions/{user_id}`）放在阶段 5 管理界面，目前由种子脚本创建。
