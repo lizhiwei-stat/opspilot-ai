@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -101,10 +102,18 @@ def main() -> int:
         ev = page.get_by_label("evals")
         expect(ev).to_contain_text("hybrid_rerank", timeout=10_000)
         expect(ev).to_contain_text("无语义")
+        # Stage 2.5: mock vs real side-by-side matrix
+        mx = page.get_by_label("eval-matrix")
+        expect(mx).to_contain_text("bge-small-zh-v1.5", timeout=10_000)
+        expect(mx).to_contain_text("heldout")
+        shot(page, args.screenshots, "stage25-evals-matrix.png")
         ev.get_by_text("hybrid_rerank").first.click()
-        expect(page.get_by_label("eval-cases")).to_contain_text("q001", timeout=10_000)
-        checks["evals_page"] = "runs + per-case drilldown"
-        shot(page, args.screenshots, "stage2-evals.png")
+        # latest run may be dev (q001) or held-out (h001)
+        expect(page.get_by_label("eval-cases")).to_contain_text(
+            re.compile(r"[qh]001"), timeout=10_000
+        )
+        checks["evals_page"] = "mock-vs-real matrix + runs + per-case drilldown"
+        shot(page, args.screenshots, "stage25-evals-cases.png")
         browser.close()
     print(
         json.dumps(

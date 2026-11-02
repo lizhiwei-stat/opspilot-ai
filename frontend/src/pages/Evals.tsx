@@ -19,18 +19,20 @@ export default function Evals({ token }: { token: string }) {
   // side-by-side matrix: mode x (embedding model, split); latest run per cell
   const colKey = (r: EvalRun) => `${String(r.config.embedding_model ?? "?")} · ${String(r.config.dataset_split ?? "dev")}`;
   const latest = new Map<string, EvalRun>();
-  for (const r of runs) {
+  // current config only: skip before/after variants (replace fusion, Stage 2 QA profile)
+  const current = runs.filter((r) => r.config.rerank_fusion !== "replace" && r.config.qa_profile !== "stage2");
+  for (const r of current) {
     const k = `${r.retriever}|${colKey(r)}`;
     const prev = latest.get(k);
     if (!prev || prev.started_at < r.started_at) latest.set(k, r);
   }
-  const cols = [...new Set(runs.map(colKey))].sort();
-  const modes = [...new Set(runs.map((r) => r.retriever))].sort();
+  const cols = [...new Set(current.map(colKey))].sort();
+  const modes = [...new Set(current.map((r) => r.retriever))].sort();
 
   return (
     <div className="space-y-6">
       {runs.length > 0 && (
-        <Card title="Mock vs 真实 Embedding 并排对比（Recall@5 / MRR@10，每格取最新一次）" label="eval-matrix">
+        <Card title="Mock vs 真实 Embedding 并排对比（Recall@5 / MRR@10，当前配置，每格取最新一次；修复前对照见下方运行列表）" label="eval-matrix">
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead className="text-left text-slate-500">

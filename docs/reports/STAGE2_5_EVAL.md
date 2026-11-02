@@ -89,7 +89,7 @@ ACL 隔离正确率：所有配置 **1.000**，0 泄漏。失败率：所有配�
 
 ## 8. 真实 Token 计数（修复 e）
 
-`chunks.token_count` 原来是字符数，改名为 `char_count`（迁移 0004）；每个模型的真实 token 数存在 `chunk_embeddings.token_count`，由该模型自己的 tokenizer 计算（bge-small 全语料 4,757，bge-m3 3,879，字符数 6,323）。付费 API 则以返回的 `usage` 为准。
+`chunks.token_count` 原来是字符数，改名为 `char_count`（迁移 0003）；每个模型的真实 token 数存在 `chunk_embeddings.token_count`，由该模型自己的 tokenizer 计算（bge-small 全语料 4,757，bge-m3 3,879，字符数 6,323）。付费 API 则以返回的 `usage` 为准。
 
 ## 9. Prompt 注入防御（修复 f，超越正则）
 
