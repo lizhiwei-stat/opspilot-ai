@@ -1,0 +1,231 @@
+import { type FormEvent, useState } from "react";
+import { type AgentRun, type User, agent } from "../api";
+import { Badge, Card, ErrorText, MockNotice, type Tone, btn, btnPrimary, input } from "../components/ui";
+import { errText } from "../errors";
+
+const STATUS: Record<AgentRun["status"], [string, Tone]> = {
+  running: ["运行中", "amber"],
+  awaiting_approval: ["等待审批", "amber"],
+  completed: ["已完成", "green"],
+  refused: ["已拒答", "red"],
+  failed: ["失败", "red"],
+  expired: ["已过期", "slate"],
+};
+const EXAMPLES = [
+  "ORD-5003 是什么错误，怎么处理",
+  "查一下工单 TCK-0001 的状态",
+  "支付网关的商户号是多少",
+  "订单接口 500 了，帮我创建一个工单",
+];
+
+export default function Agent({ token, user }: { token: string; user: User | null }) {
+  const [q, setQ] = useState(EXAMPLES[0]);
+  const [run, setRun] = useState<AgentRun | null>(null);
+  const [thread, setThread] = useState<string | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function exec(p: Promise<AgentRun>) {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await p;
+      setRun(r);
+      setThread(r.thread_id);
+    } catch (err) {
+      setError(errText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+  const onAsk = (e: FormEvent) => {
+    e.preventDefault();
+    void exec(agent.run(token, q, thread));
+  };
+
+  const turnTrace = run ? run.node_trace : [];
+  return (
+    <div className="space-y-6">
+      <Card
+        title="Agent 工作台"
+        label="agent"
+        actions={
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            {thread ? <span title={thread}>会话 {thread.slice(0, 8)}…</span> : <span>新会话</span>}
+            <button type="button" className={btn} onClick={() => { setThread(undefined); setRun(null); }}>
+              新会话
+            </button>
+          </div>
+        }
+      >
+        <form onSubmit={onAsk} className="flex gap-3">
+          <input aria-label="Agent 问题" className={`${input} flex-1`} value={q} onChange={(e) => setQ(e.target.value)} />
+          <button className={btnPrimary} disabled={busy || !q.trim()}>
+            {busy ? "执行中…" : thread ? "继续追问" : "运行"}
+          </button>
+        </form>
+        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+          {EXAMPLES.map((x) => (
+            <button key={x} type="button" className="rounded-full bg-slate-100 px-2 py-0.5 hover:bg-slate-200" onClick={() => setQ(x)}>
+              {x}
+            </button>
+          ))}
+        </div>
+        <div className="mt-3">
+          <ErrorText error={error} />
+        </div>
+      </Card>
+
+      {run && (
+        <>
+          <Card
+            label="agent-result"
+            title={`第 ${run.turn} 轮结果`}
+            actions={
+              <div className="flex flex-wrap gap-2">
+                <Badge tone={STATUS[run.status][1]}>{STATUS[run.status][0]}</Badge>
+                <Badge tone={run.is_mock ? "amber" : "indigo"}>{run.is_mock ? "Mock 模型" : run.llm}</Badge>
+                {run.intent && <Badge tone="sky">意图：{run.intent}</Badge>}
+              </div>
+            }
+          >
+            {run.is_mock && (
+              <div className="mb-3">
+                <MockNotice>
+                  Mock 智能体：用确定性规则模拟模型的分类、工具选择和摘录式生成，未调用任何大模型。这里只验证流程、权限、工具和引用核验，不代表真实模型的推理能力。
+                </MockNotice>
+              </div>
+            )}
+            <pre
+              aria-label="最终回答"
+              className={`whitespace-pre-wrap rounded-lg p-4 font-sans text-sm ${
+                run.status === "refused" || run.status === "failed" ? "bg-rose-50 text-rose-800" : "bg-slate-50"
+              }`}
+            >
+              {run.answer ?? "（无）"}
+            </pre>
+            {run.citations.length > 0 && (
+              <ol className="mt-3 space-y-1 text-xs text-slate-600" aria-label="引用">
+                {run.citations.map((c) => (
+                  <li key={c.index}>
+                    [{c.index}] {c.source === "tool" ? "工具" : "文档"} · {c.title} {c.locator && `· ${c.locator}`}
+                  </li>
+                ))}
+              </ol>
+            )}
+            {(run.refusal_reason || run.failure_reason) && (
+              <p className="mt-3 text-xs text-rose-700">
+                原因：{run.refusal_reason ?? run.failure_reason}
+                {run.assessment.missing && run.assessment.missing.length > 0 && ` · 缺少：${run.assessment.missing.join("；")}`}
+              </p>
+            )}
+            {run.policy_violations.length > 0 && <p className="mt-1 text-xs text-rose-700">核验未通过：{run.policy_violations.join("，")}</p>}
+            {run.degraded.length > 0 && <p className="mt-1 text-xs text-amber-700">降级/恢复：{run.degraded.join("，")}</p>}
+            <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-1 border-t pt-3 text-xs text-slate-500 md:grid-cols-4">
+              <dt>输入 tokens</dt>
+              <dd aria-label="tokens-in">{run.usage.tokens_in}</dd>
+              <dt>输出 tokens</dt>
+              <dd>{run.usage.tokens_out}</dd>
+              <dt>费用</dt>
+              <dd>¥{run.usage.cost_cny.toFixed(6)}</dd>
+              <dt>延迟</dt>
+              <dd aria-label="latency">{run.latency_ms ?? "–"} ms</dd>
+              <dt className="col-span-2 md:col-span-4 text-[11px]">token 来源：{run.usage.source}</dt>
+            </dl>
+          </Card>
+
+          {run.status === "awaiting_approval" && run.draft && (
+            <Card label="approval" title="人工审批（工单草稿）">
+              <p className="text-sm">
+                草稿「{run.draft.title}」· 优先级 {run.draft.priority} · 服务 {run.draft.service ?? "-"} · 状态 {run.draft.status}
+              </p>
+              {user?.role === "admin" ? (
+                <div className="mt-3 flex gap-2">
+                  <button className={btnPrimary} disabled={busy} onClick={() => void exec(agent.approve(token, run.run_id, "approved"))}>
+                    批准
+                  </button>
+                  <button className={btn} disabled={busy} onClick={() => void exec(agent.approve(token, run.run_id, "rejected"))}>
+                    驳回
+                  </button>
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-slate-500">需要管理员审批。管理员登录后可在此页打开该运行（run {run.run_id.slice(0, 8)}…）。</p>
+              )}
+            </Card>
+          )}
+          {run.draft && run.status !== "awaiting_approval" && (
+            <p className="text-xs text-slate-600" aria-label="draft-status">工单草稿状态：{run.draft.status}</p>
+          )}
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card label="node-trace" title="节点顺序">
+              <ol className="space-y-1 text-sm">
+                {turnTrace.map((n, i) => (
+                  <li key={`${n.node}-${i}`} className="flex items-center justify-between gap-2">
+                    <span className="font-mono">
+                      {i + 1}. {n.node}
+                    </span>
+                    <span className="truncate text-xs text-slate-500" title={JSON.stringify(n.detail)}>
+                      {summarize(n.detail)}
+                    </span>
+                    <Badge tone={n.status === "ok" ? "green" : "red"}>{n.ms.toFixed(1)}ms</Badge>
+                  </li>
+                ))}
+              </ol>
+              <p className="mt-3 text-[11px] text-slate-400">仅展示系统记录的节点与决策摘要，不展示模型内部推理过程。</p>
+            </Card>
+            <Card label="tool-calls" title={`工具调用（${run.tools.length}）`}>
+              {run.tools.length === 0 ? (
+                <p className="text-sm text-slate-500">本轮未调用工具</p>
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  {run.tools.map((t, i) => (
+                    <li key={i} className="rounded-md border p-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono">{t.tool}</span>
+                        <Badge tone={t.status === "ok" ? "green" : "red"}>
+                          {t.status}
+                          {t.error_class ? ` · ${t.error_class}` : ""} · 第{t.attempt}次 · {t.duration_ms}ms
+                        </Badge>
+                      </div>
+                      <p className="mt-1 truncate font-mono text-xs text-slate-500">参数：{JSON.stringify(t.args)}</p>
+                      {t.result && <p className="mt-1 text-xs text-slate-600">结果：{t.result}</p>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+
+          <Card label="agent-evidence" title={`证据（${run.evidence.length}）· 判定：${run.assessment.decision ?? "-"}`}>
+            {run.assessment.reasons && <p className="mb-2 text-xs text-slate-500">依据：{run.assessment.reasons.join("，")}</p>}
+            {run.assessment.contradictions && run.assessment.contradictions.length > 0 && (
+              <p className="mb-2 text-xs text-amber-700">矛盾：{run.assessment.contradictions.join("；")}</p>
+            )}
+            <ul className="space-y-2 text-sm">
+              {run.evidence.map((e) => (
+                <li key={e.id} className="rounded-md bg-slate-50 p-2">
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <Badge tone={e.source === "tool" ? "sky" : "slate"}>{e.source === "tool" ? "工具" : "知识库"}</Badge>
+                    <span>{e.title}</span>
+                    {e.flagged && <Badge tone="red">疑似注入（已剔除）</Badge>}
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-xs">{e.snippet}</p>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
+
+function summarize(d: Record<string, unknown>): string {
+  const keys = ["decision", "intent", "route", "next", "accepted", "calls", "status", "reason", "error", "draft"];
+  return keys
+    .filter((k) => d[k] !== undefined && d[k] !== null)
+    .map((k) => `${k}=${JSON.stringify(d[k])}`)
+    .join(" ")
+    .slice(0, 80);
+}

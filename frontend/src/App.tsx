@@ -1,5 +1,6 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { ApiError, api, type Readiness, type User, type Version } from "./api";
+import Agent from "./pages/Agent";
 import Evals from "./pages/Evals";
 import Knowledge from "./pages/Knowledge";
 import QA from "./pages/QA";
@@ -10,6 +11,7 @@ const TABS = [
   ["knowledge", "知识库"],
   ["search", "检索调试"],
   ["qa", "问答"],
+  ["agent", "Agent"],
   ["evals", "评测"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
@@ -132,6 +134,8 @@ export default function App() {
             <SearchDebug token={token} embeddingProvider={version?.embedding_provider} />
           ) : tab === "qa" ? (
             <QA token={token} />
+          ) : tab === "agent" ? (
+            <Agent token={token} user={user} />
           ) : (
             <Evals token={token} />
           )}

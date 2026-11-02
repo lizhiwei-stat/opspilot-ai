@@ -21,14 +21,14 @@ describe("App", () => {
           503,
         );
       return respond({
-        name: "OpsPilot AI", version: "0.1.0", stage: 2, env: "test", llm_provider: "mock",
+        name: "OpsPilot AI", version: "0.1.0", stage: 3, env: "test", llm_provider: "mock",
         llm_model: "mock-llm-v1", embedding_provider: "mock", embedding_model: "m", embedding_dim: 1024,
       });
     });
     render(<App />);
     await waitFor(() => expect(screen.getByText("未就绪")).toBeTruthy());
     expect(screen.getByText("失败")).toBeTruthy();
-    expect(screen.getByText(/Stage 2/)).toBeTruthy();
+    expect(screen.getByText(/Stage 3/)).toBeTruthy();
   });
 
   it("shows a network error when the backend is unreachable", async () => {

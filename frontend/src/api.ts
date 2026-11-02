@@ -264,3 +264,77 @@ export const rag = {
   evalRun: (t: string, id: string) =>
     request<EvalRun & { cases: EvalCase[] }>(`/api/v1/evals/runs/${id}`, { headers: auth(t) }),
 };
+
+// ---------------------------------------------------------------- Stage 3: Agent
+export interface TraceNode {
+  turn: number;
+  node: string;
+  status: string;
+  ms: number;
+  detail: Record<string, unknown>;
+}
+export interface AgentEvidence {
+  id: string;
+  source: "kb" | "tool";
+  title: string;
+  locator: string;
+  flagged: boolean;
+  score: number | null;
+  snippet: string;
+}
+export interface AgentToolCall {
+  tool: string;
+  status: string;
+  args: Record<string, unknown>;
+  result: string | null;
+  error_class: string | null;
+  attempt: number;
+  duration_ms: number;
+  idempotency_key: string | null;
+}
+export interface AgentCitation {
+  index: number;
+  source: string;
+  title: string;
+  locator: string;
+  id: string;
+}
+export interface AgentRun {
+  run_id: string;
+  thread_id: string;
+  turn: number;
+  status: "running" | "awaiting_approval" | "completed" | "refused" | "failed" | "expired";
+  question: string;
+  intent: string | null;
+  answer: string | null;
+  citations: AgentCitation[];
+  node_trace: TraceNode[];
+  evidence: AgentEvidence[];
+  assessment: { decision?: string; reasons?: string[]; missing?: string[]; contradictions?: string[] };
+  refusal_reason: string | null;
+  policy_violations: string[];
+  degraded: string[];
+  tools: AgentToolCall[];
+  pending_approval: { type: string; draft_id: string; payload_sha256: string } | null;
+  draft: { draft_id: string; status: string; title: string; priority: string; service: string | null } | null;
+  usage: { tokens_in: number; tokens_out: number; cost_cny: number; source: string };
+  latency_ms: number | null;
+  failure_reason: string | null;
+  is_mock: boolean;
+  llm: string;
+  created_at: string;
+}
+
+const authJson = (token: string, body?: unknown): RequestInit => ({
+  method: body === undefined ? "GET" : "POST",
+  headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+  body: body === undefined ? undefined : JSON.stringify(body),
+});
+
+export const agent = {
+  run: (token: string, question: string, thread_id?: string) =>
+    request<AgentRun>("/api/v1/agent/runs", authJson(token, { question, thread_id })),
+  get: (token: string, id: string) => request<AgentRun>(`/api/v1/agent/runs/${id}`, authJson(token)),
+  approve: (token: string, id: string, decision: "approved" | "rejected", comment = "") =>
+    request<AgentRun>(`/api/v1/agent/runs/${id}/approval`, authJson(token, { decision, comment })),
+};

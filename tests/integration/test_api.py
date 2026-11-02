@@ -32,7 +32,7 @@ def test_ready_all_checks_pass(client: TestClient) -> None:
 
 def test_version(client: TestClient) -> None:
     body = client.get("/api/v1/system/version").json()
-    assert body["stage"] == 2 and body["llm_provider"] == "mock"
+    assert body["stage"] == 3 and body["llm_provider"] == "mock"
     assert body["embedding_dim"] == 1024
 
 
