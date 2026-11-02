@@ -1,0 +1,46 @@
+{
+  "params": {
+    "n": 100000,
+    "dim": 128,
+    "selectivity": 0.01,
+    "queries": 30,
+    "k": 10,
+    "ef_search": 40,
+    "seed": 7,
+    "out": "/home/administrator/projects/opspilot-ai/evals/results",
+    "acl_groups": 100
+  },
+  "settings": {
+    "off": {
+      "uses_hnsw_index": true,
+      "rows_returned_mean": 0.37,
+      "rows_returned_min": 0,
+      "queries_short_of_k": 30,
+      "recall_vs_exact": 0.037,
+      "latency_ms_p50": 0.95,
+      "latency_ms_p95": 1.37
+    },
+    "relaxed_order": {
+      "uses_hnsw_index": true,
+      "rows_returned_mean": 10,
+      "rows_returned_min": 10,
+      "queries_short_of_k": 0,
+      "recall_vs_exact": 0.72,
+      "latency_ms_p50": 7.73,
+      "latency_ms_p95": 10.37
+    },
+    "strict_order": {
+      "uses_hnsw_index": true,
+      "rows_returned_mean": 10,
+      "rows_returned_min": 10,
+      "queries_short_of_k": 0,
+      "recall_vs_exact": 0.293,
+      "latency_ms_p50": 7.09,
+      "latency_ms_p95": 7.45
+    }
+  },
+  "pgvector": "0.8.7",
+  "load_s": 4.3,
+  "index_build_s": 24.2,
+  "finished_at": "2026-11-02T05:24:19.927300+00:00"
+}

@@ -1,0 +1,33 @@
+{
+  "n_chunks": 42,
+  "threads": 8,
+  "cpu_count": 16,
+  "BAAI/bge-small-zh-v1.5": {
+    "dim": 512,
+    "load_s": 2.53,
+    "corpus_encode_s": 0.476,
+    "chunks_per_s": 88.2,
+    "query_ms_p50": 4.03,
+    "query_ms_p95": 4.55,
+    "corpus_tokens": 4757,
+    "max_chunk_tokens": 316,
+    "peak_rss_mb_so_far": 712
+  },
+  "BAAI/bge-m3": {
+    "dim": 1024,
+    "load_s": 1.07,
+    "corpus_encode_s": 7.313,
+    "chunks_per_s": 5.7,
+    "query_ms_p50": 53.37,
+    "query_ms_p95": 57.95,
+    "corpus_tokens": 3879,
+    "max_chunk_tokens": 271,
+    "peak_rss_mb_so_far": 2271
+  },
+  "BAAI/bge-reranker-base": {
+    "load_s": 0.66,
+    "rerank20_ms_p50": 1663.6,
+    "rerank20_ms_max": 1728.5,
+    "peak_rss_mb_so_far": 2271
+  }
+}

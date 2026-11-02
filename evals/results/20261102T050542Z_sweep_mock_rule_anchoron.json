@@ -1,0 +1,3680 @@
+{
+  "meta": {
+    "embedding": "mock",
+    "reranker": "rule",
+    "signal": "lexical",
+    "anchor": "on",
+    "dataset": "dev",
+    "grid": [
+      0.2,
+      0.25,
+      0.3,
+      0.33,
+      0.35,
+      0.4,
+      0.45,
+      0.5
+    ],
+    "selection_rule": "max accuracy; tie -> higher refusal; tie -> higher thr",
+    "commit": "4f50e1e5f73cfb18e3d474e27cd0a1f7d7d2af3a+dirty",
+    "started_at": "2026-11-02T05:05:42.715342+00:00"
+  },
+  "selected": 0.25,
+  "rows": [
+    {
+      "threshold": 0.2,
+      "refusal_rate": 0.917,
+      "answer_rate": 1.0,
+      "accuracy": 0.9818,
+      "false_accepts": [
+        "q053"
+      ],
+      "false_refusals": [],
+      "cases": [
+        {
+          "case_id": "q001",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q002",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q003",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q004",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.8333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q005",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.7143,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q006",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q007",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q008",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q009",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q010",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q011",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q012",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q013",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q014",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q015",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.75,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q016",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q017",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q018",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q019",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q020",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q021",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.2667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q022",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.2857,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q023",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.7143,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q024",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q025",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.4286,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q026",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.3333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q027",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.25,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q028",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q029",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.2857,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q030",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.375,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q031",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.3333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q032",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.4,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q033",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.3333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q034",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.3333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q035",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q036",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q037",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6154,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q038",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.8182,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q039",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.75,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q040",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q041",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q042",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5714,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q043",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q044",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q045",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.5714,
+          "refusal_reason": "unmatched_anchor:Java"
+        },
+        {
+          "case_id": "q046",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q047",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q048",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.5,
+          "refusal_reason": "unmatched_anchor:Redis"
+        },
+        {
+          "case_id": "q049",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q050",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1429,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q051",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q052",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q053",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": true,
+          "evidence_score": 0.2,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q054",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q055",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        }
+      ]
+    },
+    {
+      "threshold": 0.25,
+      "refusal_rate": 1.0,
+      "answer_rate": 1.0,
+      "accuracy": 1.0,
+      "false_accepts": [],
+      "false_refusals": [],
+      "cases": [
+        {
+          "case_id": "q001",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q002",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q003",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q004",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.8333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q005",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.7143,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q006",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q007",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q008",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q009",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q010",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q011",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q012",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q013",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q014",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q015",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.75,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q016",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q017",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q018",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q019",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q020",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q021",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.2667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q022",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.2857,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q023",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.7143,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q024",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q025",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.4286,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q026",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.3333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q027",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.25,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q028",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q029",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.2857,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q030",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.375,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q031",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.3333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q032",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.4,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q033",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.3333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q034",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.3333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q035",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q036",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q037",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6154,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q038",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.8182,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q039",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.75,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q040",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q041",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q042",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5714,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q043",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q044",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q045",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.5714,
+          "refusal_reason": "unmatched_anchor:Java"
+        },
+        {
+          "case_id": "q046",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q047",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q048",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.5,
+          "refusal_reason": "unmatched_anchor:Redis"
+        },
+        {
+          "case_id": "q049",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q050",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1429,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q051",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q052",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q053",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.2,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q054",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q055",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        }
+      ]
+    },
+    {
+      "threshold": 0.3,
+      "refusal_rate": 1.0,
+      "answer_rate": 0.907,
+      "accuracy": 0.9273,
+      "false_accepts": [],
+      "false_refusals": [
+        "q021",
+        "q022",
+        "q027",
+        "q029"
+      ],
+      "cases": [
+        {
+          "case_id": "q001",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q002",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q003",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q004",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.8333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q005",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.7143,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q006",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q007",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q008",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q009",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q010",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q011",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q012",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q013",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q014",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q015",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.75,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q016",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q017",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q018",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q019",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q020",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q021",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q022",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2857,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q023",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.7143,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q024",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q025",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.4286,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q026",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.3333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q027",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.25,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q028",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q029",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2857,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q030",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.375,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q031",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.3333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q032",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.4,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q033",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.3333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q034",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.3333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q035",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q036",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q037",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6154,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q038",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.8182,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q039",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.75,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q040",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q041",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q042",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5714,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q043",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q044",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q045",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.5714,
+          "refusal_reason": "unmatched_anchor:Java"
+        },
+        {
+          "case_id": "q046",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q047",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q048",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.5,
+          "refusal_reason": "unmatched_anchor:Redis"
+        },
+        {
+          "case_id": "q049",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q050",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1429,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q051",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q052",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q053",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.2,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q054",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q055",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        }
+      ]
+    },
+    {
+      "threshold": 0.33,
+      "refusal_rate": 1.0,
+      "answer_rate": 0.907,
+      "accuracy": 0.9273,
+      "false_accepts": [],
+      "false_refusals": [
+        "q021",
+        "q022",
+        "q027",
+        "q029"
+      ],
+      "cases": [
+        {
+          "case_id": "q001",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q002",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q003",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q004",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.8333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q005",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.7143,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q006",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q007",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q008",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q009",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q010",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q011",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q012",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q013",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q014",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q015",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.75,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q016",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q017",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q018",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q019",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q020",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q021",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q022",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2857,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q023",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.7143,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q024",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q025",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.4286,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q026",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.3333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q027",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.25,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q028",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q029",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2857,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q030",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.375,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q031",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.3333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q032",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.4,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q033",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.3333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q034",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.3333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q035",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q036",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q037",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6154,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q038",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.8182,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q039",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.75,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q040",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q041",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q042",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5714,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q043",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q044",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q045",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.5714,
+          "refusal_reason": "unmatched_anchor:Java"
+        },
+        {
+          "case_id": "q046",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q047",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q048",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.5,
+          "refusal_reason": "unmatched_anchor:Redis"
+        },
+        {
+          "case_id": "q049",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q050",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1429,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q051",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q052",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q053",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.2,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q054",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q055",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        }
+      ]
+    },
+    {
+      "threshold": 0.35,
+      "refusal_rate": 1.0,
+      "answer_rate": 0.814,
+      "accuracy": 0.8545,
+      "false_accepts": [],
+      "false_refusals": [
+        "q021",
+        "q022",
+        "q026",
+        "q027",
+        "q029",
+        "q031",
+        "q033",
+        "q034"
+      ],
+      "cases": [
+        {
+          "case_id": "q001",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q002",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q003",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q004",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.8333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q005",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.7143,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q006",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q007",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q008",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q009",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q010",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q011",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q012",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q013",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q014",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q015",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.75,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q016",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q017",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q018",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q019",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q020",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q021",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q022",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2857,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q023",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.7143,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q024",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q025",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.4286,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q026",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.3333,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q027",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.25,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q028",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q029",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2857,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q030",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.375,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q031",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.3333,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q032",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.4,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q033",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.3333,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q034",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.3333,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q035",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q036",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q037",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6154,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q038",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.8182,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q039",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.75,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q040",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q041",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q042",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5714,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q043",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q044",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q045",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.5714,
+          "refusal_reason": "unmatched_anchor:Java"
+        },
+        {
+          "case_id": "q046",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q047",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q048",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.5,
+          "refusal_reason": "unmatched_anchor:Redis"
+        },
+        {
+          "case_id": "q049",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q050",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1429,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q051",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q052",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q053",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.2,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q054",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q055",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        }
+      ]
+    },
+    {
+      "threshold": 0.4,
+      "refusal_rate": 1.0,
+      "answer_rate": 0.791,
+      "accuracy": 0.8364,
+      "false_accepts": [],
+      "false_refusals": [
+        "q021",
+        "q022",
+        "q026",
+        "q027",
+        "q029",
+        "q030",
+        "q031",
+        "q033",
+        "q034"
+      ],
+      "cases": [
+        {
+          "case_id": "q001",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q002",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q003",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q004",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.8333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q005",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.7143,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q006",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q007",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q008",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q009",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q010",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q011",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q012",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q013",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q014",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q015",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.75,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q016",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q017",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q018",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q019",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q020",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q021",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q022",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2857,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q023",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.7143,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q024",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q025",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.4286,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q026",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.3333,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q027",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.25,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q028",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q029",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2857,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q030",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.375,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q031",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.3333,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q032",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.4,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q033",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.3333,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q034",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.3333,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q035",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q036",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q037",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6154,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q038",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.8182,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q039",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.75,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q040",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q041",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q042",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5714,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q043",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q044",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q045",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.5714,
+          "refusal_reason": "unmatched_anchor:Java"
+        },
+        {
+          "case_id": "q046",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q047",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q048",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.5,
+          "refusal_reason": "unmatched_anchor:Redis"
+        },
+        {
+          "case_id": "q049",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q050",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1429,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q051",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q052",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q053",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.2,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q054",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q055",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        }
+      ]
+    },
+    {
+      "threshold": 0.45,
+      "refusal_rate": 1.0,
+      "answer_rate": 0.744,
+      "accuracy": 0.8,
+      "false_accepts": [],
+      "false_refusals": [
+        "q021",
+        "q022",
+        "q025",
+        "q026",
+        "q027",
+        "q029",
+        "q030",
+        "q031",
+        "q032",
+        "q033",
+        "q034"
+      ],
+      "cases": [
+        {
+          "case_id": "q001",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q002",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q003",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q004",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.8333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q005",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.7143,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q006",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q007",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q008",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q009",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q010",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q011",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q012",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q013",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q014",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q015",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.75,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q016",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q017",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q018",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q019",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q020",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q021",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q022",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2857,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q023",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.7143,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q024",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q025",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.4286,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q026",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.3333,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q027",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.25,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q028",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q029",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2857,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q030",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.375,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q031",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.3333,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q032",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.4,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q033",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.3333,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q034",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.3333,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q035",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q036",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q037",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6154,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q038",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.8182,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q039",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.75,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q040",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q041",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q042",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5714,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q043",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q044",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q045",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.5714,
+          "refusal_reason": "unmatched_anchor:Java"
+        },
+        {
+          "case_id": "q046",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q047",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q048",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.5,
+          "refusal_reason": "unmatched_anchor:Redis"
+        },
+        {
+          "case_id": "q049",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q050",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1429,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q051",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q052",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q053",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.2,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q054",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q055",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        }
+      ]
+    },
+    {
+      "threshold": 0.5,
+      "refusal_rate": 1.0,
+      "answer_rate": 0.744,
+      "accuracy": 0.8,
+      "false_accepts": [],
+      "false_refusals": [
+        "q021",
+        "q022",
+        "q025",
+        "q026",
+        "q027",
+        "q029",
+        "q030",
+        "q031",
+        "q032",
+        "q033",
+        "q034"
+      ],
+      "cases": [
+        {
+          "case_id": "q001",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q002",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q003",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q004",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.8333,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q005",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.7143,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q006",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q007",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q008",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q009",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q010",
+          "category": "exact_keyword",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q011",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q012",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q013",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q014",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q015",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.75,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q016",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q017",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q018",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q019",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q020",
+          "category": "error_code",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 1.0,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q021",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q022",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2857,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q023",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.7143,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q024",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q025",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.4286,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q026",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.3333,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q027",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.25,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q028",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q029",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.2857,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q030",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.375,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q031",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.3333,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q032",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.4,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q033",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.3333,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q034",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": false,
+          "evidence_score": 0.3333,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q035",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q036",
+          "category": "paraphrase",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q037",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6154,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q038",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.8182,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q039",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.75,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q040",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q041",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q042",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.5714,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q043",
+          "category": "multi_doc",
+          "expect_answer": true,
+          "answered": true,
+          "evidence_score": 0.6667,
+          "refusal_reason": null
+        },
+        {
+          "case_id": "q044",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q045",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.5714,
+          "refusal_reason": "unmatched_anchor:Java"
+        },
+        {
+          "case_id": "q046",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q047",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q048",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.5,
+          "refusal_reason": "unmatched_anchor:Redis"
+        },
+        {
+          "case_id": "q049",
+          "category": "no_answer",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q050",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1429,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q051",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q052",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.0,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q053",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.2,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q054",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        },
+        {
+          "case_id": "q055",
+          "category": "no_permission",
+          "expect_answer": false,
+          "answered": false,
+          "evidence_score": 0.1667,
+          "refusal_reason": "below_threshold"
+        }
+      ]
+    }
+  ]
+}
