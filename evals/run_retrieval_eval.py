@@ -102,6 +102,7 @@ def pct(xs: list[float], p: float) -> float:
 
 
 def verify_gold(session: Session, cases: list[dict]) -> None:
+    bad: list[str] = []
     for c in cases:
         for g in c["relevant"]:
             hit = session.scalar(
@@ -115,9 +116,9 @@ def verify_gold(session: Session, cases: list[dict]) -> None:
                 .limit(1)
             )
             if hit is None:
-                raise SystemExit(
-                    f"gold check failed: {c['id']} phrase {g['contains']!r} not in {g['doc']}"
-                )
+                bad.append(f"{c['id']} phrase {g['contains']!r} not in {g['doc']}")
+    if bad:
+        raise SystemExit("gold check failed:\n  " + "\n  ".join(bad))
 
 
 def score_case(case: dict, cands: list) -> dict:
