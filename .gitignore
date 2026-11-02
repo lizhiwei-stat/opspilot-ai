@@ -9,3 +9,4 @@ frontend/dist/
 *.log
 .pgdata/
 .pgserver-venv/
+*.tsbuildinfo

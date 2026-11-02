@@ -1,0 +1,14 @@
+# Build context is the repo root (see infra/docker-compose.yml). Keep secrets and local artefacts out.
+.env
+.env.*
+!.env.example
+.git
+.venv
+.pgdata
+.pgserver-venv
+**/node_modules
+**/dist
+**/__pycache__
+.pytest_cache
+.ruff_cache
+*.tsbuildinfo

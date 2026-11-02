@@ -1,252 +1,225 @@
-# 第一阶段开发报告（Stage 1）
+# 第一阶段开发报告（Stage 1 / 1.1）
 
-日期：2026-11-02（Asia/Hong_Kong）｜提交：见 tag `stage-1`
+- 2026-11-02 上午（Asia/Hong_Kong）
+- `stage-1`（d06eabc）：初版，在开发沙箱中验证，保留不动。
+- `stage-1.1`：在 Teddy 的 WSL2 上用 Docker Compose 实际部署，加上代码审查后的修复。本报告以 stage-1.1 为准。
 
-## 1. 环境检查结果（开发沙箱，Debian 13）
+验证范围分三类：
+- **已实际验证**：命令真的执行过，下面贴的是原始输出。
+- **仅静态检查**：做过语法或配置检查，没有真正运行。
+- **尚未验证**：既没运行，也没检查。
 
-| 项 | 结果 |
+---
+
+## 1. 环境（WSL2 实测）
+
+| 项 | 版本 / 结果 |
 |---|---|
-| Python | 系统 3.13.5；项目用 uv 安装的 **3.11.17**（`uv sync -p 3.11`） |
-| uv | 0.13.5 |
-| Node | 系统 20.19.2 → jsdom 30 要求 Node ≥ 22.22，另装 **Node 22.23.4 LTS** 到 `/opt` 后构建与测试 |
-| Docker | **不可用**（`docker: command not found`） |
-| apt | 沙箱网络拦截 Debian 源（HTTP 500 / TLS EOF），无法 apt 安装 PostgreSQL |
-| PostgreSQL + pgvector | 改用 PyPI `pgserver 0.1.4` 自带的 **PostgreSQL 16.2 + pgvector 0.6.2** 二进制，在 127.0.0.1:5432 启动真实服务 |
-| GPU | 不需要 |
+| WSL | Ubuntu-24.04（WSL2） |
+| Git | 2.43.0 |
+| Docker / Compose | Docker 29.9.2（build a82e528）/ Docker Compose v5.6.1 |
+| uv | 0.13.4（宿主）；镜像内为 0.13.5 |
+| Python | 宿主 `.venv`：3.11.17（uv 自动下载）；后端镜像：3.11.18（`python:3.11-slim`） |
+| Node | 前端镜像 `node:22-alpine`：v22.23.4；宿主 WSL 没有安装 Node（不需要） |
+| PostgreSQL / pgvector | PostgreSQL 17.11（Debian 17.11-1.pgdg13+2）/ vector 0.8.7 |
+| 端口（Teddy 机器上的取值） | PG `127.0.0.1:5433`，后端 `127.0.0.1:8020`，前端 `127.0.0.1:5173` |
 
-**诚实说明**：本阶段实际跑通的是"本地 PostgreSQL 16.2 + pgvector 0.6.2 进程 + uvicorn + Vite dev server"。`infra/docker-compose.yml`（PG17 + pgvector 0.8.7 镜像）、Dockerfile 和 GitHub Actions 只做了 YAML 解析校验，**没有真正运行过**。
+端口说明：8000 和 8010 已被 zhanggui 项目占用（8000 是 zhanggui-api 容器，8010 是 `offline_demo.py`），所以本机 `.env` 改用 8020 和 5433。zhanggui 的容器和进程都没有动过。
 
-## 2. 实际执行的命令与真实输出
+本次没有执行任何 sudo 或系统级改动，也没有调用付费模型（全程 Mock 模式）。
 
-### 2.1 数据库迁移（全新库）
+## 2. 已实际验证（WSL2，原始输出节选）
+
+### 2.1 Docker Compose 启动
 ```
-$ alembic current
-0001 (head)
-$ alembic check
-No new upgrade operations detected.
-$ python scripts/seed_demo.py
+$ docker compose --env-file .env -f infra/docker-compose.yml up -d --build
+ Image opspilot-backend Built
+ Image opspilot-frontend Built
+ Container opspilot-postgres-1 Started
+ Container opspilot-postgres-1 Healthy
+ Container opspilot-backend-1 Started
+ Container opspilot-backend-1 Healthy
+ Container opspilot-frontend-1 Started
+$ docker ps --filter name=opspilot
+opspilot-backend-1 Up 27 seconds (healthy) 127.0.0.1:8020->8000/tcp
+opspilot-frontend-1 Up 3 minutes 127.0.0.1:5173->5173/tcp
+opspilot-postgres-1 Up 6 seconds (healthy) 127.0.0.1:5433->5432/tcp
+```
+第一次启动失败：后端容器以 `exited (2)` 退出，日志为 `Failed to initialize cache at /home/app/.cache/uv: Permission denied`。原因和修复见 §4。
+
+### 2.2 PostgreSQL 与 pgvector
+```
+PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu
+ vector | 0.8.7 | public | vector data type and ivfflat and hnsw access methods
+public 表数量: 16
+```
+
+### 2.3 Alembic 迁移
+后端容器启动时会自动执行 `alembic upgrade head`：
+```
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+$ docker exec opspilot-backend-1 alembic current   ->  0001 (head)
+$ docker exec opspilot-backend-1 alembic check     ->  No new upgrade operations detected.
+$ (宿主 uv) alembic current / check（连 compose 库 :5433）  ->  0001 (head) / No new upgrade operations detected.
+```
+回滚往返测试只在一次性库 `opspilot_rt` 上做，做完就删掉了：
+```
+$ alembic upgrade head   ; current -> 0001 (head)
+$ alembic downgrade base ; current -> (空)
+$ alembic upgrade head   ; current -> 0001 (head)
+$ alembic check -> No new upgrade operations detected.   表数量 16
+DROP DATABASE opspilot_rt  -> 剩余库: opspilot, opspilot_test, postgres, template0, template1
+```
+
+### 2.4 种子数据
+```
+$ docker exec opspilot-backend-1 python scripts/seed_demo.py
 seed complete, newly created: {'users': 3, 'knowledge_bases': 2, 'kb_permissions': 1}
-$ psql \dx vector
-                           List of installed extensions
-  Name  | Version | Schema |                     Description                      
---------+---------+--------+------------------------------------------------------
- vector | 0.6.2   | public | vector data type and ivfflat and hnsw access methods
-(1 row)
-
+$ （再次执行）
+seed complete, newly created: {'users': 0, 'knowledge_bases': 0, 'kb_permissions': 0}
 ```
-另外在开发中执行过 `alembic upgrade head → downgrade base → upgrade head` 完整往返；集成测试每次运行也会执行一次 downgrade/upgrade。
 
-### 2.2 启动后端并检查健康
+### 2.5 健康检查
 ```
-$ uvicorn opspilot.main:create_app --factory --port 8000
-$ curl -s localhost:8000/health/live
+$ curl -s localhost:8020/health/live
 {"status":"alive","version":"0.1.0"}
-$ curl -s localhost:8000/health/ready
-{"status":"ready","checks":[{"name":"database","ok":true,"latency_ms":6.51,"detail":"postgres 16.2"},{"name":"pgvector","ok":true,"latency_ms":1.73,"detail":"pgvector 0.6.2, cosine_distance_probe=1.0"},{"name":"migrations","ok":true,"latency_ms":0.41,"detail":"alembic revision 0001"},{"name":"llm","ok":true,"latency_ms":0.01,"detail":"mock/mock-llm-v1: offline deterministic mock"},{"name":"embedding","ok":true,"latency_ms":0.12,"detail":"mock/mock-hash-embedding-v1 dim=1024"}]}
+$ curl -s localhost:8020/health/ready
+{"status":"ready","checks":[{"name":"database","ok":true,"latency_ms":10.62,"detail":"postgres 17.11 (Debian 17.11-1.pgdg13+2)"},{"name":"pgvector","ok":true,"latency_ms":1.61,"detail":"pgvector 0.8.7, cosine_distance_probe=1.0"},{"name":"migrations","ok":true,"latency_ms":0.81,"detail":"alembic revision 0001"},{"name":"llm","ok":true,"latency_ms":0.04,"detail":"mock/mock-llm-v1: offline deterministic mock"},{"name":"embedding","ok":true,"latency_ms":0.2,"detail":"mock/mock-hash-embedding-v1 dim=1024"}]}
 HTTP 200
 ```
-停掉数据库后的就绪检查（真实输出，节选）：
+
+### 2.6 数据库不可用时返回 503，恢复后回到 200
 ```
-{"status":"not_ready","checks":[{"name":"database","ok":false,...,"detail":"OperationalError: ... port 5432 failed: Connection refused"}, ... {"name":"llm","ok":true,...},{"name":"embedding","ok":true,...}]}
+$ docker compose ... stop postgres
+$ curl -s localhost:8020/health/ready
+{"status":"not_ready","checks":[{"name":"database","ok":false,"latency_ms":8002.91,"detail":"OperationalError: (psycopg.OperationalError) failed to resolve host 'postgres': [Errno -3] Temporary failure in name resolution"},{"name":"pgvector","ok":false,"latency_ms":0.0,"detail":"skipped: database unavailable"},{"name":"migrations","ok":false,"latency_ms":0.0,"detail":"skipped: database unavailable"},{"name":"llm","ok":true,...},{"name":"embedding","ok":true,...}]}
 HTTP 503
+$ curl localhost:8020/health/live  -> {"status":"alive","version":"0.1.0"} HTTP 200
+$ docker compose ... start postgres ; sleep 6 ; curl .../health/ready  -> HTTP 200
 ```
-重启数据库后立即恢复 `HTTP 200`（`pool_pre_ping` 生效）。
+修复前，这次请求要等约 24 秒（三项检查各等 8 秒）。修复后只等第一次 DNS 失败的约 8 秒，见 §4。
 
-登录与鉴权（curl 实测）：
+### 2.7 前端可访问，并通过代理连接后端
 ```
-$ POST /api/v1/auth/login (admin) → 200，GET /api/v1/auth/me →
-{"id":"59d02f20-…","email":"admin@opspilot.local","display_name":"Ops Admin","role":"admin"}
-$ POST /api/v1/auth/login 错误密码 →
-{"error":{"code":"unauthorized","message":"Invalid email or password","request_id":"6b2fad6f…","details":null}} HTTP 401
+$ curl -s localhost:5173/ | grep -o '<title>.*</title>'   -> <title>OpsPilot AI</title>
+$ curl -s localhost:5173/health/ready                     -> {"status":"ready",...}  HTTP 200
+$ curl -s localhost:5173/api/v1/system/version
+{"name":"OpsPilot AI","version":"0.1.0","stage":1,"env":"dev","llm_provider":"mock",...,"embedding_dim":1024}
+$ CORS 预检 OPTIONS :8020/api/v1/auth/login  Origin: http://localhost:5173
+HTTP/1.1 200 OK
+access-control-allow-origin: http://localhost:5173
 ```
-结构化访问日志（真实一行）：
-```
-{"method": "GET", "path": "/api/v1/auth/me", "status": 200, "duration_ms": 6.72, "event": "http_request", "request_id": "b5831714651241398e88b352820c6e31", "level": "info", "timestamp": "2026-11-02T02:51:29.976520Z"}
-```
-前端经 Vite 代理访问后端：`curl localhost:5173/api/v1/system/version` 返回与后端一致的 JSON；无头 Chrome 截图见 `docs/assets/stage1-status.png`。
+截图 `docs/assets/stage1-wsl-compose.png`：用 Windows 上的 Edge 无头模式访问 `http://localhost:5173`。页面上的 PG 17.11 和 pgvector 0.8.7 来自后端真实接口返回，没有写死在页面里。
 
-### 2.3 pytest（单元 + 连真实 PostgreSQL 的集成测试，`OPSPILOT_REQUIRE_DB=1`）
+### 2.8 JWT 登录与权限（经前端代理）
 ```
-tests/integration/test_api.py::test_live PASSED                          [  3%]
-tests/integration/test_api.py::test_request_id_propagated PASSED         [  6%]
-tests/integration/test_api.py::test_ready_all_checks_pass PASSED         [  9%]
-tests/integration/test_api.py::test_version PASSED                       [ 12%]
-tests/integration/test_api.py::test_login_me_and_roles PASSED            [ 15%]
-tests/integration/test_api.py::test_login_failures_are_uniform PASSED    [ 18%]
-tests/integration/test_api.py::test_me_requires_valid_token PASSED       [ 21%]
-tests/integration/test_api.py::test_error_envelope_validation_and_404 PASSED [ 25%]
-tests/integration/test_schema.py::test_all_tables_and_extension PASSED   [ 28%]
-tests/integration/test_schema.py::test_indexes_exist PASSED              [ 31%]
-tests/integration/test_schema.py::test_vector_and_fulltext_search_roundtrip PASSED [ 34%]
-tests/integration/test_schema.py::test_check_constraint_enforced PASSED  [ 37%]
-tests/integration/test_schema.py::test_document_version_unique PASSED    [ 40%]
-tests/unit/test_config.py::test_defaults_are_mock_and_secret_hidden PASSED [ 43%]
-tests/unit/test_config.py::test_openai_provider_requires_key PASSED      [ 46%]
-tests/unit/test_config.py::test_short_jwt_secret_rejected PASSED         [ 50%]
-tests/unit/test_config.py::test_prod_rejects_dev_secret PASSED           [ 53%]
-tests/unit/test_config.py::test_embedding_dim_locked_to_schema PASSED    [ 56%]
-tests/unit/test_health_unit.py::test_readiness_reports_db_down_without_raising PASSED [ 59%]
-tests/unit/test_llm.py::test_mock_llm_deterministic_and_counts_tokens PASSED [ 62%]
-tests/unit/test_llm.py::test_mock_llm_rejects_empty PASSED               [ 65%]
-tests/unit/test_llm.py::test_mock_embedding_normalised_and_semantic_overlap PASSED [ 68%]
-tests/unit/test_llm.py::test_mock_embedding_empty_text_is_zero_vector PASSED [ 71%]
-tests/unit/test_llm.py::test_factory_builds_mock_by_default PASSED       [ 75%]
-tests/unit/test_llm.py::test_openai_compat_constructs_without_network PASSED [ 78%]
-tests/unit/test_llm.py::test_openai_compat_wraps_errors PASSED           [ 81%]
-tests/unit/test_logging.py::test_json_logs_redact_secrets PASSED         [ 84%]
-tests/unit/test_security.py::test_password_hash_roundtrip PASSED         [ 87%]
-tests/unit/test_security.py::test_jwt_roundtrip_and_claims PASSED        [ 90%]
-tests/unit/test_security.py::test_jwt_tampered_or_wrong_secret_rejected PASSED [ 93%]
-tests/unit/test_security.py::test_jwt_alg_none_rejected PASSED           [ 96%]
-tests/unit/test_security.py::test_jwt_expired_rejected PASSED            [100%]
-============================== 32 passed in 1.73s ==============================
+admin token len 308, user token len 307
+GET /api/v1/auth/me (admin) -> {"id":"43f45bf0-…","email":"admin@opspilot.local","display_name":"Ops Admin","role":"admin"}
+GET /api/v1/auth/me (alice) -> {"id":"f2a7407c-…","email":"alice@opspilot.local","display_name":"Alice (Support)","role":"user"}
+GET /api/v1/system/admin-ping (admin) -> {"status":"ok","scope":"admin"} HTTP 200
+GET /api/v1/system/admin-ping (alice) -> {"error":{"code":"forbidden","message":"Requires role: admin",...}} HTTP 403
+GET /api/v1/auth/me (无 token)        -> {"error":{"code":"unauthorized","message":"Missing bearer token",...}} HTTP 401
+POST /api/v1/auth/login 错误密码       -> {"error":{"code":"unauthorized","message":"Invalid email or password",...}}
 ```
 
-### 2.4 Ruff
+### 2.9 数据持久化
 ```
-All checks passed!
-50 files already formatted
-```
-
-### 2.5 前端构建与测试
-```
-computing gzip size...
-dist/index.html                   0.41 kB │ gzip:  0.28 kB
-dist/assets/index-DUo1Db9i.css   10.58 kB │ gzip:  2.95 kB
-dist/assets/index--2eiSn_b.js   224.53 kB │ gzip: 70.56 kB
-
-✓ built in 148ms
- Test Files  1 passed (1)
-      Tests  2 passed (2)
+INSERT INTO audit_logs(action,...) VALUES ('persistence_marker',...)   users=3, marker=1
+$ docker compose ... restart        -> users=3, marker=1, ready HTTP 200
+$ docker compose ... down（不加 -v） -> 卷 opspilot_pgdata 仍在
+$ docker compose ... up -d          -> users=3, marker=1, ready HTTP 200
 ```
 
-### 2.6 开发过程中遇到并修复的问题
-| 问题 | 原因 | 处理 |
+### 2.10 测试与静态检查（WSL 宿主，连 compose 中的 `opspilot_test`）
+```
+$ OPSPILOT_REQUIRE_DB=1 uv run pytest -v   ->  38 passed in 1.53s   （0 failed，0 skipped）
+$ uv run ruff check .                      ->  All checks passed!
+$ uv run ruff format --check .             ->  52 files already formatted
+$ docker exec opspilot-frontend-1 npm test ->  Test Files 1 passed (1) / Tests 2 passed (2)
+$ docker exec opspilot-frontend-1 npm run build -> ✓ built（index.js 224.53 kB）
+```
+38 个 pytest 用例中，16 个是单元测试，22 个是连真实 PostgreSQL 17 + pgvector 0.8.7 的集成测试。开发沙箱（PostgreSQL 16.2 + pgvector 0.6.2）上同样是 38 passed。
+
+## 3. 仅静态检查 / 尚未验证
+
+| 项 | 状态 | 说明 |
 |---|---|---|
-| `alembic check` 报缺少外键 | `tickets ↔ ticket_drafts` 循环外键用了 `use_alter`，autogenerate 在 `create_table` 中静默丢弃 | 在迁移中两表创建后单独 `create_foreign_key`，downgrade 先删该约束；`alembic check` 通过 |
-| 登录返回 422 | `EmailStr`（email-validator）拒绝 `.local` 等保留域名 | 改为简单格式校验，移除 email-validator 依赖 |
-| Vitest 无法启动 worker | jsdom 30 / undici 需要 Node ≥ 22 | 统一要求 Node 22 LTS（`engines`、Dockerfile、CI） |
-| Tailwind v4 边框为黑色 | v4 默认 `border-color: currentColor` | 在 base 层设为 slate-200 |
-| alembic 弃用警告 | 缺少 `path_separator` | `alembic.ini` 加 `path_separator = os` |
+| `.github/workflows/ci.yml` | 仅静态检查 | 只做了 YAML 解析；仓库没有推送，没有在 GitHub 上运行过 |
+| 浏览器里点击登录 | 尚未验证 | 登录接口已经通过前端代理用 curl 验证；页面上的登录表单没有用浏览器实际点过（Vitest 覆盖了页面渲染和错误展示） |
+| `scripts/local_pg.sh` 在 WSL 上的运行 | 尚未验证 | 只在开发沙箱实测过；WSL 上走的是 Docker |
+| 生产构建方式（nginx 静态托管前端） | 尚未实现 | 前端容器现在用的是 Vite dev server，适合本地演示，不适合生产环境 |
+| OpenAI 兼容（Qwen）真实调用 | 尚未验证（有意为之） | 阶段 1 不调用付费 API；单元测试只验证了错误包装 |
 
-## 3. 已实现 / 未实现
+## 4. 代码审查：发现的问题与修复
 
-**已实现并有测试覆盖**
-- 配置：pydantic-settings，`OPSPILOT_` 前缀；校验 JWT 密钥长度、prod 禁用默认密钥、openai_compatible 必须有 Key、向量维度必须为 1024；密钥用 `SecretStr`。
-- 日志：structlog JSON，request_id（接受合法的 `X-Request-ID`，否则生成），password/token/api_key 等字段自动打码。
-- 错误：统一 `{"error":{...}}`，覆盖 AppError、HTTP 404/405、422、未捕获异常（500 不泄露细节）。
-- 数据库：16 张表的完整 schema（见 DATABASE.md），含 HNSW 向量索引、tsvector 生成列 + GIN、CHECK/UNIQUE 约束；测试验证了向量最近邻与全文检索在真实 pgvector 上可用。
-- 健康检查：live / ready（5 项独立检查，失败 503）。
-- Provider：`LLMProvider`/`EmbeddingProvider` 协议；MockLLM（确定性 + 近似 token 计数）、MockEmbedding（特征哈希，1024 维）、OpenAICompatLLM/Embedding（错误被包装为 `LLMError`；单元测试只连 127.0.0.1:9 验证错误包装，**未调用任何真实/付费 API**）。
-- 认证：Argon2id 密码哈希、PyJWT HS256（拒绝 `alg=none`、过期、篡改、错误签发者），`/login`、`/me`、`require_role("admin")`；用户不存在时仍做一次哈希校验以平衡耗时，错误信息统一。
-- 种子数据：3 个演示用户、2 个知识库（restricted / public）、1 条 ACL 授权；幂等。
-- 前端：React 19 + TS + Vite 8 + Tailwind v4 状态页 + 登录，调用真实 `/health/ready`、`/api/v1/system/version`、`/auth/login`、`/auth/me`；2 个 Vitest 测试（503 渲染失败项、网络错误）。
-- 工程：uv + `uv.lock`、Ruff、Makefile、`.env.example`、`.gitignore`、`scripts/local_pg.sh`（无 Docker 时的 PG+pgvector 方案，已实测 start → migrate → stop）。
+| # | 问题 | 影响 | 修复 | 复测 |
+|---|---|---|---|---|
+| 1 | 后端镜像里用 `uv run` 启动，非 root 用户没有 uv 缓存目录 | 容器启动失败，exit 2 | 把 `.venv/bin` 加入 PATH，直接执行 `alembic` 和 `uvicorn` | compose up 后为 healthy |
+| 2 | 端口写死且绑定 0.0.0.0；数据库账号密码写死在 compose 里 | 和 zhanggui 端口冲突，并且暴露到局域网 | 所有端口只绑 127.0.0.1，并可用 `OPSPILOT_*_PORT` 配置；数据库账号密码改为 `OPSPILOT_PG_*` 变量（默认 opspilot，仅限本地）；CORS 跟随前端端口 | 5433/8020/5173 实测 |
+| 3 | compose 文件在 `infra/` 下，默认只读 `infra/.env` | 根目录 `.env` 里的端口变量不生效 | 命令统一加 `--env-file .env`，README 和 Makefile 同步修改 | 实测 |
+| 4 | 集成测试会先 downgrade 到 base（清空所有表），但没有检查连的是哪个库 | 测试 URL 填错时可能清空主库 | 库名不以 `_test` 或 `_rt` 结尾时直接报错，拒绝执行 | 38 passed |
+| 5 | 测试只从进程环境变量读测试库地址，不读 `.env` | WSL 上 17 个测试报错（连到了 5432） | 用 python-dotenv 读取 `.env`（已作为显式 dev 依赖） | 38 passed |
+| 6 | `.env.example` 里的 JSON 值没有加引号，`source .env` 后引号被 shell 去掉 | 宿主上 alembic 启动即崩溃（cors_origins 解析失败） | 值改为单引号包裹 | 宿主 alembic current/check 通过 |
+| 7 | 数据库宕机时 ready 接口要等三次连接超时 | 探针约 24 秒才返回 | 数据库检查失败时，跳过依赖它的两项检查 | 约 8 秒返回 503 |
+| 8 | `env.py` 没有调用 `fileConfig`，迁移日志不输出 | 看不到迁移过程 | 补上 `fileConfig`，并设置 `propagate=0` 避免日志重复 | 容器日志可见 |
+| 9 | prod 环境下没有拒绝 `.env.example` 里的 JWT 占位值 | 可能带着默认密钥上线 | 占位值以 `change-me` 开头时拒绝启动，并补了测试 | 通过 |
+| 10 | 测试有一部分只断言状态码 | 验证力度不够 | 新增测试：token 的 sub/role 与用户一致；停用用户的 token 和登录都会被拒；种子幂等且 ACL 记录准确（只有 alice 能读 order-platform），密码为 argon2id 存储；数据库不可用时 503 且失败项准确；500 错误不泄露异常细节 | 32 → 38 |
+| 11 | 没有 `.dockerignore`；`tsconfig.tsbuildinfo` 被提交进了仓库 | 构建上下文偏大，可能把 `.env` 或 node_modules 带进镜像 | 新增 `.dockerignore`；从 git 移除 tsbuildinfo 并加入 ignore | 已重新构建 |
+| 12 | 本地 Python 版本没有固定（WSL 默认是 3.12） | 本地和镜像（3.11）版本不一致 | 新增 `.python-version`，值为 3.11 | 宿主 3.11.17 |
 
-**未实现（按计划在后续阶段）**
-- 文档上传 / 解析 / 分块 / 检索 / 引用 / ACL 过滤查询（阶段 2）
-- LangGraph Agent、工具调用、重试降级（阶段 3）
-- MCP Server、审批 API、Checkpointer 恢复（阶段 4）
-- 完整管理界面（阶段 5）
-- 评测、Prompt Injection 测试、PII 脱敏、上传校验（阶段 6）
-- LangChain / LangGraph / MCP SDK 尚未加入依赖（阶段 3/4 引入时再核对版本）
-- Docker Compose 与 CI 未实际运行（见 §1）
+**审查后确认没有问题的部分**
+- 分层：API 路由只调用 Service，Service 调用 Repository；配置只在 `core/config.py` 中读取。
+- 健康检查服务直接执行 SQL，这是探针性质的代码，可以接受。
+- 前端只调用真实接口（`/health/ready`、`/api/v1/system/version`、`/auth/login`、`/auth/me`），没有写死数据。只有 Vitest 里 mock 了 fetch，这是测试本身的需要。
+- `.env` 已经在 `.gitignore` 中（`git check-ignore -v .env` 输出 `.gitignore:1:.env`），没有被提交。
+- 仓库中没有 `sk-` 开头的密钥，也没有 DashScope Key。
 
-## 4. 关键技术决策
-见 [ARCHITECTURE.md §4](../ARCHITECTURE.md)。摘要：PostgreSQL + pgvector 一库承载业务、向量与全文；中文关键词检索采用"应用层分词 + `simple` tsvector"；同步 SQLAlchemy 2 + psycopg 3；向量 1024 维对齐 text-embedding-v4；Provider 协议 + 默认 Mock；PyJWT + Argon2；live/ready 分离且就绪检查不花 token；工单写入只能经服务端审批（数据库唯一约束 + 哈希校验）；TypeScript 选 5.9 稳定线而非 7.0。
+**有意保留的明文默认值**
+- `.env.example` 中的 `OPSPILOT_SEED_*` 是本地演示账号的密码，`OPSPILOT_PG_PASSWORD=opspilot` 是本地开发用的数据库密码。
+- 端口只绑在 127.0.0.1 上，外部访问不到；README 已经写明这些值仅用于本地演示。
 
-## 5. 复现步骤
+**版本一致性**
+- Python 3.11：pyproject、`.python-version`、Dockerfile、CI 一致。
+- uv：镜像 0.13.5，CI 0.13.5，宿主 0.13.4。lock 文件可以兼容，这一点已经实测（`uv sync --frozen` 通过）。
+- Node 22：package.json 的 `engines >=22.22.2`、镜像 22.23.4、CI 22 一致。
+- pgvector：compose 和 CI 用 0.8.7（本次实测），开发沙箱是 0.6.2（同样 38 passed）。代码只用到 HNSW 和余弦距离，这两者从 0.5 版本起就支持。
+
+## 5. 从零启动命令（WSL2）
+见 README「快速开始」。在 Teddy 机器上实际使用的版本如下：
 ```bash
-cd opspilot-ai
+cd ~/projects/opspilot-ai
 cp .env.example .env
-uv sync -p 3.11
-scripts/local_pg.sh start          # 或 docker compose -f infra/docker-compose.yml up -d postgres
-uv run alembic upgrade head
-uv run python scripts/seed_demo.py
-make test                          # 期望：32 passed
-make lint                          # 期望：All checks passed!
-cd frontend && npm ci && npm run build && npm test   # 期望：2 passed（需 Node 22）
-make dev-backend & (cd frontend && npm run dev)
-curl -s localhost:8000/health/ready
+sed -i 's/^OPSPILOT_PG_PORT=.*/OPSPILOT_PG_PORT=5433/; s/^OPSPILOT_BACKEND_PORT=.*/OPSPILOT_BACKEND_PORT=8020/; s#127.0.0.1:5432/#127.0.0.1:5433/#g' .env
+sed -i "s/^OPSPILOT_JWT_SECRET=.*/OPSPILOT_JWT_SECRET=$(python3 -c 'import secrets;print(secrets.token_urlsafe(48))')/" .env
+docker compose --env-file .env -f infra/docker-compose.yml up -d --build
+docker compose --env-file .env -f infra/docker-compose.yml exec backend python scripts/seed_demo.py
+curl -s localhost:8020/health/ready
+uv sync --frozen && OPSPILOT_REQUIRE_DB=1 uv run pytest -v && uv run ruff check .
+docker compose --env-file .env -f infra/docker-compose.yml exec frontend npm test
+# 浏览器: http://localhost:5173  账号 admin@ / alice@ / bob@opspilot.local，密码见 .env 的 OPSPILOT_SEED_*
 ```
 
-## 6. 本阶段文件清单（git ls-files）
-```
-.env.example
-.github/workflows/ci.yml
-.gitignore
-Makefile
-README.md
-alembic.ini
-backend/migrations/env.py
-backend/migrations/script.py.mako
-backend/migrations/versions/20261102_0001_initial_schema.py
-backend/src/opspilot/__init__.py
-backend/src/opspilot/api/__init__.py
-backend/src/opspilot/api/deps.py
-backend/src/opspilot/api/routes/__init__.py
-backend/src/opspilot/api/routes/auth.py
-backend/src/opspilot/api/routes/health.py
-backend/src/opspilot/api/routes/system.py
-backend/src/opspilot/api/schemas.py
-backend/src/opspilot/core/__init__.py
-backend/src/opspilot/core/config.py
-backend/src/opspilot/core/errors.py
-backend/src/opspilot/core/logging.py
-backend/src/opspilot/core/middleware.py
-backend/src/opspilot/core/security.py
-backend/src/opspilot/db/__init__.py
-backend/src/opspilot/db/base.py
-backend/src/opspilot/db/models.py
-backend/src/opspilot/db/session.py
-backend/src/opspilot/llm/__init__.py
-backend/src/opspilot/llm/base.py
-backend/src/opspilot/llm/factory.py
-backend/src/opspilot/llm/mock.py
-backend/src/opspilot/llm/openai_compat.py
-backend/src/opspilot/main.py
-backend/src/opspilot/repositories/__init__.py
-backend/src/opspilot/repositories/users.py
-backend/src/opspilot/services/__init__.py
-backend/src/opspilot/services/auth.py
-backend/src/opspilot/services/health.py
-docs/API.md
-docs/ARCHITECTURE.md
-docs/DATABASE.md
-docs/PRD.md
-docs/PROGRESS.md
-docs/reports/STAGE1_REPORT.md
-docs/assets/stage1-status.png
-evals/README.md
-frontend/index.html
-frontend/package-lock.json
-frontend/package.json
-frontend/src/App.test.tsx
-frontend/src/App.tsx
-frontend/src/api.ts
-frontend/src/index.css
-frontend/src/main.tsx
-frontend/tsconfig.json
-frontend/tsconfig.tsbuildinfo
-frontend/vite.config.ts
-infra/backend.Dockerfile
-infra/docker-compose.yml
-infra/frontend.Dockerfile
-infra/postgres-init.sql
-pyproject.toml
-scripts/local_pg.sh
-scripts/seed_demo.py
-tests/__init__.py
-tests/conftest.py
-tests/integration/__init__.py
-tests/integration/conftest.py
-tests/integration/test_api.py
-tests/integration/test_schema.py
-tests/unit/__init__.py
-tests/unit/test_config.py
-tests/unit/test_health_unit.py
-tests/unit/test_llm.py
-tests/unit/test_logging.py
-tests/unit/test_security.py
-uv.lock
-```
+## 6. 已实现 / 未实现
+**已实现**
+- 后端基础：配置、结构化日志与 request_id、统一错误格式。
+- 完整的数据库 schema 和迁移。
+- live / ready 健康检查。
+- Mock 与 OpenAI 兼容两套 Provider。
+- JWT 认证和角色控制。
+- 种子数据。
+- 最小前端。
+- Docker Compose 部署。
+
+**未实现**
+- 阶段 2 到 6 的全部功能：RAG、Agent、MCP、审批、完整界面、评测、安全测试。
+- LangChain、LangGraph、MCP SDK 尚未加入依赖。
+
+## 7. 第二阶段开始前仍需解决的问题
+1. **CI 没有真正运行过**：需要推送到 GitHub（必须由 Teddy 同意）后，确认 Actions 能通过。
+2. **数据库宕机时 ready 仍要约 8 秒**：耗时在 Docker DNS 解析失败，`connect_timeout=3` 管不到 DNS 这一步。可以考虑给探针加整体超时（例如在线程中执行并限制 2 秒），或者接受现状，并把容器探针超时设为 10 秒以上。
+3. **前端容器是 Vite dev 模式**：阶段 5 或 6 改为构建产物 + nginx，同时决定由 nginx 反向代理 API，还是靠 CORS 直连后端。
+4. **中文关键词检索**：阶段 2 需要选定中文分词器（如 jieba），并确定 `search_text` 的生成规则。
+5. **LangGraph checkpoint 表**：由 `langgraph-checkpoint-postgres` 的 `setup()` 自行管理，需要在阶段 4 确认它和 Alembic 共存的方式。
+6. **工具版本差异**：宿主 uv 0.13.4 与镜像的 0.13.5 有小版本差异，可以统一升级。
+7. **演示账号密码**：现在是公开在 `.env.example` 里的默认值，正式演示前建议在 `.env` 中改掉。
