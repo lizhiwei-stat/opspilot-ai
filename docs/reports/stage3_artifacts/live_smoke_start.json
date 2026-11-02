@@ -1,0 +1,201 @@
+{
+ "knowledge": {
+  "http": 200,
+  "status": "completed",
+  "final_status": "answered",
+  "turn": 1,
+  "nodes": [
+   "guard_in",
+   "classify",
+   "plan",
+   "retrieve",
+   "assess",
+   "generate",
+   "verify",
+   "respond"
+  ],
+  "tools": [],
+  "refusal_reason": null,
+  "latency_ms": 341,
+  "tokens": [
+   20,
+   172
+  ],
+  "is_mock": true,
+  "answer": "【Mock 智能体 · 规则模拟，未调用大模型；仅验证流程与工具，不代表真实模型推理能力】\n[1] 访问令牌（Access Token）有效期为 60 分钟，刷新令牌（Refresh Token）有效期为 14 天。\n[2] 401 表示身"
+ },
+ "error_code": {
+  "http": 200,
+  "status": "completed",
+  "final_status": "answered",
+  "turn": 1,
+  "nodes": [
+   "guard_in",
+   "classify",
+   "plan",
+   "retrieve",
+   "assess",
+   "agent",
+   "tools",
+   "collect",
+   "assess",
+   "generate",
+   "verify",
+   "respond"
+  ],
+  "tools": [
+   "analyze_error_code:ok",
+   "query_mock_logs:ok"
+  ],
+  "refusal_reason": null,
+  "latency_ms": 57,
+  "tokens": [
+   57,
+   258
+  ],
+  "is_mock": true,
+  "answer": "【Mock 智能体 · 规则模拟，未调用大模型；仅验证流程与工具，不代表真实模型推理能力】\n[1] 错误码 ORD-5003：所属服务 order-service；类别 5xx；可重试：是。\n[2] order-service 最近 3 条"
+ },
+ "h029": {
+  "http": 200,
+  "status": "refused",
+  "final_status": "refused",
+  "turn": 1,
+  "nodes": [
+   "guard_in",
+   "classify",
+   "plan",
+   "retrieve",
+   "assess",
+   "agent",
+   "tools",
+   "collect",
+   "assess",
+   "refuse"
+  ],
+  "tools": [
+   "search_knowledge:ok"
+  ],
+  "refusal_reason": "value_slot_empty",
+  "latency_ms": 54,
+  "tokens": [
+   22,
+   0
+  ],
+  "is_mock": true,
+  "answer": "无法给出可靠回答：在你有权限访问的资料和工具结果中没有足够证据。\n缺少的信息：证据提到了该对象，但没有给出具体数值"
+ },
+ "contradiction": {
+  "http": 200,
+  "status": "completed",
+  "final_status": "clarify",
+  "turn": 1,
+  "nodes": [
+   "guard_in",
+   "classify",
+   "plan",
+   "retrieve",
+   "assess",
+   "respond"
+  ],
+  "tools": [],
+  "refusal_reason": "contradictory_evidence",
+  "latency_ms": 32,
+  "tokens": [
+   13,
+   0
+  ],
+  "is_mock": true,
+  "answer": "资料之间存在矛盾，请确认你指的是哪个场景/版本：\n- 资料中该值随版本变化或不同来源不一致：30/50←release-notes-order-v2.3.txt"
+ },
+ "multi_turn": {
+  "turn1": {
+   "status": "completed",
+   "final_status": "answered",
+   "turn": 1,
+   "nodes": [
+    "guard_in",
+    "classify",
+    "plan",
+    "agent",
+    "tools",
+    "collect",
+    "assess",
+    "generate",
+    "verify",
+    "respond"
+   ],
+   "tools": [
+    "get_ticket:ok"
+   ],
+   "refusal_reason": null,
+   "latency_ms": 31,
+   "tokens": [
+    54,
+    112
+   ],
+   "is_mock": true,
+   "answer": "【Mock 智能体 · 规则模拟，未调用大模型；仅验证流程与工具，不代表真实模型推理能力】\n[1] 工单 TCK-0001「订单接口 500 报错，日志出现 ORD-5003」状态 open，优先级 P2，服务 order-service。"
+  },
+  "turn2": {
+   "status": "completed",
+   "final_status": "answered",
+   "turn": 2,
+   "nodes": [
+    "guard_in",
+    "classify",
+    "plan",
+    "agent",
+    "tools",
+    "collect",
+    "assess",
+    "generate",
+    "verify",
+    "respond"
+   ],
+   "tools": [
+    "get_ticket:ok"
+   ],
+   "refusal_reason": null,
+   "latency_ms": 30,
+   "tokens": [
+    27,
+    112
+   ],
+   "is_mock": true,
+   "answer": "【Mock 智能体 · 规则模拟，未调用大模型；仅验证流程与工具，不代表真实模型推理能力】\n[1] 工单 TCK-0001「订单接口 500 报错，日志出现 ORD-5003」状态 open，优先级 P2，服务 order-service。"
+  }
+ },
+ "draft": {
+  "http": 200,
+  "status": "awaiting_approval",
+  "final_status": "awaiting_approval",
+  "turn": 1,
+  "nodes": [
+   "guard_in",
+   "classify",
+   "plan",
+   "agent",
+   "tools",
+   "collect"
+  ],
+  "tools": [
+   "create_ticket_draft:ok"
+  ],
+  "refusal_reason": null,
+  "latency_ms": 23,
+  "tokens": [
+   38,
+   0
+  ],
+  "is_mock": true,
+  "answer": "已生成待审批工单草稿 ade47c4b…，等待管理员审批。",
+  "draft": {
+   "draft_id": "ade47c4b-d8ac-4fe3-93b4-bde931b864c7",
+   "status": "pending_approval",
+   "title": "订单接口 500 了，帮我创建一个工单",
+   "priority": "P3",
+   "service": "order-service"
+  }
+ }
+}

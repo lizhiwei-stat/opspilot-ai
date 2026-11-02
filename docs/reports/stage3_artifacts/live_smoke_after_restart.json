@@ -1,0 +1,42 @@
+{
+ "status_after_restart_before_approval": "awaiting_approval",
+ "alice_approve_http": 403,
+ "admin_approve_http": 200,
+ "after": {
+  "status": "completed",
+  "final_status": "answered",
+  "turn": 1,
+  "nodes": [
+   "guard_in",
+   "classify",
+   "plan",
+   "agent",
+   "tools",
+   "collect",
+   "approval",
+   "apply_approval",
+   "respond"
+  ],
+  "tools": [
+   "create_ticket_draft:ok"
+  ],
+  "refusal_reason": null,
+  "latency_ms": 40,
+  "tokens": [
+   38,
+   0
+  ],
+  "is_mock": true,
+  "answer": "草稿已审批通过（第三阶段仅记录审批；真实建单在第四阶段通过 MCP 执行）。"
+ },
+ "draft": {
+  "draft_id": "ade47c4b-d8ac-4fe3-93b4-bde931b864c7",
+  "status": "approved",
+  "title": "订单接口 500 了，帮我创建一个工单",
+  "priority": "P3",
+  "service": "order-service"
+ },
+ "create_ticket_draft_executions": 1,
+ "second_approve_http": 409,
+ "checkpoints_in_thread": 11
+}
