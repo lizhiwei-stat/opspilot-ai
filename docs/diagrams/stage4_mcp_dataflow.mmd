@@ -1,0 +1,39 @@
+sequenceDiagram
+  autonumber
+  actor A as alice (user)
+  actor R as admin (reviewer)
+  participant API as FastAPI
+  participant G as LangGraph
+  participant H as MCPHub
+  participant KD as Knowledge / Diagnostics MCP
+  participant T as Ticket MCP
+  participant DB as PostgreSQL
+  A->>API: POST /agent/runs "ORD-5003 错误，查文档和日志，分析并创建待审核工单"
+  API->>G: start(thread, user from JWT)
+  G->>G: classify=incident_ticket · plan(allowed tools)
+  G->>DB: retrieve (ACL 检索门槛)
+  G->>H: search_knowledge / analyze_error_code / query_system_logs / get_service_status
+  H->>KD: tools/call + _meta caller token
+  KD->>DB: verify token → load user → ACL → audit(server)
+  KD-->>H: structured_content (schema 校验, 大小上限)
+  G->>G: collect → generate → verify (引用核验)
+  G->>H: create_ticket_draft (服务端拼装标题/描述/优先级)
+  H->>T: tools/call (identity = alice)
+  T->>DB: ticket_drafts(pending_approval, payload_sha256)
+  G-->>API: interrupt(approval, draft_id, revision) → checkpoint
+  API-->>A: awaiting_approval（无审批按钮）
+  R->>API: GET /agent/approvals（重启后仍可恢复）
+  R->>API: POST approval {returned, comment}
+  API->>G: Command(resume) · reviewer 由服务端注入
+  G->>H: revise_ticket_draft (identity = owner)
+  H->>T: 新草稿 v2 (parent_draft_id), 旧草稿 returned
+  G-->>API: interrupt(approval v2)
+  R->>API: POST approval {approved}
+  API->>G: Command(resume)
+  G->>DB: approvals(reviewer=admin, decided_at)
+  G->>H: update_ticket_status(draft_id, approval_id) as admin
+  H->>T: tools/call
+  T->>DB: 行锁草稿 · 校验 approval=approved & reviewer admin & payload hash<br/>→ tickets(source_draft_id UNIQUE) + ticket_events(approval_id UNIQUE)
+  T-->>H: ticket_number, deduplicated=false
+  G-->>API: completed · draft executed · TCK-xxxx
+  Note over T,DB: 重放同一 approval → deduplicated=true，不会产生第二张工单

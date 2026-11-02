@@ -3,8 +3,8 @@
 > Production-oriented AI Support & Ticket Resolution Platform
 > 面向软件企业技术支持 / 研发 / 客服团队的智能技术支持 Agent 平台：查文档、查日志、给出有出处的故障建议、生成待审工单，人工审批后才落库。
 
-**当前进度：阶段 3（LangGraph 企业 Agent，Mock）已完成，在 WSL2 + Docker Compose 上实测（tag `stage-3`）** —— 详见 [docs/PROGRESS.md](docs/PROGRESS.md)、[阶段 3 报告](docs/reports/STAGE3_REPORT.md)、[Agent State](docs/AGENT_STATE.md)、[ADR-003](docs/adr/ADR-003-stage3-agent.md)。
-Agent 默认 Mock（规则 + 抽取式，未调用大模型）；真实 Qwen 测试待授权（[方案](docs/STAGE3_QWEN_TEST_PLAN.md)）。MCP 与真实建单尚未实现（第四阶段）。README 只写已经验证过的内容。
+**当前进度：阶段 4（MCP 工具接入 + 审批工作流，Mock 模型）已完成，在 WSL2 + Docker Compose 上实测（tag `stage-4`）** —— 详见 [docs/PROGRESS.md](docs/PROGRESS.md)、[阶段 4 报告](docs/reports/STAGE4_REPORT.md)、[ADR-004](docs/adr/ADR-004-stage4-mcp.md)。
+工具经真实 MCP 协议（官方 SDK mcp 2.3，stdio 子进程）调用；审批通过后才由 Ticket MCP 创建正式工单。Agent 默认 Mock（规则 + 抽取式，未调用大模型）；阶段 4 的真实 Qwen 测试待授权（[预算方案](docs/STAGE4_QWEN_BUDGET_PLAN.md)）。README 只写已经验证过的内容。
 
 > ⚠️ 默认 **Mock 模式**：mock embedding 是特征哈希的字/词袋向量，**没有语义理解**；mock 回答器是**抽取式**的（摘录原文 + 引用），**没有调用大模型**。界面和接口都明确标注了这一点。阶段 2.5 起可选**免费本地 CPU 模型**（bge-small-zh-v1.5 / bge-m3 embedding、bge-reranker-base 重排），已实测；真实 DashScope / Qwen 付费路径有多重守卫，**尚未运行**（[方案待批准](docs/STAGE2_5_PAID_EMBED_PLAN.md)）。
 
@@ -13,6 +13,7 @@ Agent 默认 Mock（规则 + 抽取式，未调用大模型）；真实 Qwen 测
 ## 文档
 - [PRD 需求说明](docs/PRD.md) · [架构说明](docs/ARCHITECTURE.md) · [数据库设计](docs/DATABASE.md) · [API 设计](docs/API.md)
 - [阶段进度](docs/PROGRESS.md) · [阶段 1 报告](docs/reports/STAGE1_REPORT.md) · [阶段 2 设计](docs/STAGE2_DESIGN.md) · [阶段 2 报告](docs/reports/STAGE2_REPORT.md) · [检索评测报告](docs/reports/STAGE2_EVAL.md)
+- [阶段 4 报告](docs/reports/STAGE4_REPORT.md) · [ADR-004](docs/adr/ADR-004-stage4-mcp.md) · [MCP 架构图](docs/diagrams/stage4_mcp_architecture.png) · [数据流图](docs/diagrams/stage4_mcp_dataflow.png) · [MCP + 审批 Notebook（含输出）](notebooks/mcp_agent_workflow.ipynb) · [Qwen 预算方案（未执行）](docs/STAGE4_QWEN_BUDGET_PLAN.md)
 - [阶段 3 报告](docs/reports/STAGE3_REPORT.md) · [Agent State](docs/AGENT_STATE.md) · [ADR-003](docs/adr/ADR-003-stage3-agent.md) · [Agent 流程图](docs/diagrams/stage3_agent_graph.png) · [Qwen 测试方案（未执行）](docs/STAGE3_QWEN_TEST_PLAN.md)
 - [阶段 2.5 报告](docs/reports/STAGE2_5_REPORT.md) · [阶段 2.5 评测](docs/reports/STAGE2_5_EVAL.md) · [评测汇总表](docs/reports/STAGE2_5_TABLES.md) · [付费 Embedding 对照方案（未执行）](docs/STAGE2_5_PAID_EMBED_PLAN.md) · [阶段 3 设计](docs/STAGE3_DESIGN.md)
 - [RAG 流程 Notebook（中文，含输出）](notebooks/rag_walkthrough.ipynb) · [真实 Embedding / 混合检索 Notebook（中文，含输出）](notebooks/real_embedding_hybrid.ipynb)
@@ -100,11 +101,28 @@ cd frontend && npm ci && npm run dev      # :5173，需要 Node 22
 本地评测：`uv run --group local-embed python evals/run_retrieval_eval.py --embedding local --dataset dev|heldout --rerankers rule,cross_encoder`。
 **付费路径**（`--embedding dashscope --i-understand-this-costs-money`）另需 `OPSPILOT_ALLOW_PAID_API=true`、`OPSPILOT_PAID_APPROVAL_ID`、`OPSPILOT_PAID_BUDGET_CNY`，超出预算在发请求前拒绝；**尚未运行**。
 
+## 阶段 4：MCP 工具 + 审批工作流（Mock 模型）
+三个 MCP Server（stdio，后端按需拉起，无需单独部署）：
+| Server | 工具 |
+|---|---|
+| `opspilot-knowledge` | `search_knowledge` · `get_document` · `list_knowledge_bases` |
+| `opspilot-ticket` | `get_ticket` · `list_tickets` · `create_ticket_draft` · `update_ticket_status`（仅审批后由后端调用）· `revise_ticket_draft`（仅后端） |
+| `opspilot-diagnostics` | `query_system_logs` · `get_service_status` · `analyze_error_code` |
+
+```bash
+uv run python scripts/mcp_demo_client.py --as alice     # 真实 tools/list + tools/call 演示
+uv run pytest -q tests/mcp                               # 协议 / 安全 / 审批 / 重启恢复
+```
+示例：在 Agent 页输入「ORD-5003 错误，查文档和日志，分析并创建待审核工单」→ 等待审批；管理员在「待审批队列」打开 → 填写意见后「退回修改」或「批准」→ 显示工单号、状态流转与 MCP 审计。
+身份不来自模型参数：每次调用带一个 30 秒有效、绑定工具和参数哈希的签名令牌（`_meta`），MCP Server 从数据库重新加载用户再做 ACL。子进程拿不到 LLM Key 和 JWT 密钥。
+
+![阶段 4：审批通过后由 Ticket MCP 建单，并显示 MCP 审计（Windows Edge 截图）](docs/assets/stage4_ticket_created_audit.png)
+
 ## 阶段 3：Agent（Mock）
 ```bash
 # 检查点表（backend 启动时自动 setup；也可手动）
 uv run python -m opspilot.agent.checkpoint setup
-# 41 场景 Agent 评测（Mock，免费；只在 *_test / *_eval 库上 --prepare）
+# 45 场景 Agent 评测（阶段 4 起默认经 MCP）（Mock，免费；只在 *_test / *_eval 库上 --prepare）
 uv run python evals/run_agent_eval.py --prepare --db-url "$OPSPILOT_TEST_DATABASE_URL" --tag local
 # 实时栈冒烟：发起审批 → 重启 backend → 审批恢复
 uv run python scripts/agent_api_smoke.py start && docker compose --env-file .env -f infra/docker-compose.yml restart backend && uv run python scripts/agent_api_smoke.py approve

@@ -71,7 +71,8 @@ SSE 流式事件（`text/event-stream`、`/events`）**尚未实现**，留待�
 | GET | `/api/v1/agent/runs` | 登录 | 本人运行列表（admin 可见全部） |
 | GET | `/api/v1/agent/runs/{run_id}` | 本人/admin | 运行详情：status、final_status、answer、citations、node_trace、tool_calls（含 deduplicated）、evidence、assessment、usage（tokens/耗时/费用）、degraded、draft |
 | GET | `/api/v1/agent/runs/{run_id}/history` | 本人/admin | 该 thread 的检查点历史（来自 PostgresSaver） |
-| POST | `/api/v1/agent/runs/{run_id}/approval` | **admin** | `{"decision": "approved"\|"rejected", "comment": ""}`；仅 `awaiting_approval` 状态可用；普通用户 403，重复审批 409，超过 24h 自动 expired |
+| POST | `/api/v1/agent/runs/{run_id}/approval` | **admin** | `{"decision": "approved"\|"rejected"\|"returned", "comment": ""}`；`returned`（退回修改）必须带意见，生成新草稿版本后再次等待审批；批准后由 Ticket MCP `update_ticket_status` 建单（响应 `draft_result.ticket_number`）；仅 `awaiting_approval` 可用；普通用户 403，重复审批 409，超过 24h 自动 expired |
+| GET | `/api/v1/agent/approvals` | **admin** | 阶段 4：待审批队列（所有 `awaiting_approval` 运行，重启后仍可恢复） |
 | POST | `/api/v1/agent/runs/{run_id}/resume` | 本人/admin | 进程崩溃后从最后一个检查点继续（仅当该运行仍有待执行节点且 run_id 匹配） |
 
 运行状态：`running` · `awaiting_approval` · `completed` · `refused` · `failed` · `expired`；最终答案状态 `final_status`：answered / refused / clarify / awaiting_approval / failed。
@@ -84,5 +85,22 @@ SSE 流式事件（`text/event-stream`、`/events`）**尚未实现**，留待�
 | GET | `/api/v1/evals/runs/{id}` | ✅ 阶段 2：指标 + 逐条结果 |
 | POST | `/api/v1/evals/runs` | 🔜 触发评测（admin）；目前通过 `evals/run_retrieval_eval.py` 离线运行 |
 
-## MCP Server（阶段 4，独立进程）
-工具：`search_knowledge`、`query_mock_logs`、`get_ticket`、`create_ticket_draft`。输入输出以 Pydantic 模型声明；调用方身份通过服务端令牌传入并做 ACL 校验；不提供任何直接创建正式工单的工具。
+## MCP Server（阶段 4 ✅ 已实现）
+官方 Python SDK `mcp 2.3`（协议 2026-07-28），后端以 stdio 子进程拉起：`python -m opspilot.mcp.servers.{knowledge|ticket|diagnostics}`；可选 `--transport http --host 127.0.0.1 --port N`（需 `OPSPILOT_MCP_HTTP_TOKEN`，Origin 白名单 `OPSPILOT_MCP_HTTP_ALLOWED_ORIGINS`）。
+
+| Server | 工具 | 读/写 |
+|---|---|---|
+| opspilot-knowledge | `search_knowledge(query, top_k)` · `get_document(document, max_chunks)` · `list_knowledge_bases()` | 读（按调用者 KB 权限） |
+| opspilot-ticket | `get_ticket(ticket_number)` · `list_tickets(status?, service?, limit)` | 读（本人 / admin） |
+| | `create_ticket_draft(title, description, priority, service?, category)` | 写草稿（pending_approval） |
+| | `update_ticket_status(draft_id, approval_id)` | 写工单：需要数据库中的 admin 审批记录，恰好一次，重复返回 `deduplicated=true` |
+| | `revise_ticket_draft(parent_draft_id, title, description, priority)` | 仅后端（退回修改） |
+| opspilot-diagnostics | `query_system_logs(service, level?, error_code?, limit)` · `get_service_status(service)` · `analyze_error_code(code)` | 读 |
+
+调用者身份：`_meta["opspilot.local/caller"]` 中的 HS256 令牌（aud=server、tool、参数 SHA-256、jti、TTL 30s）；服务端重新加载用户并执行 ACL。错误以 `is_error` + `[permission|not_found|conflict|transient|upstream|internal] 消息` 返回。
+
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| GET | `/api/v1/mcp/servers` | admin | 实时 `tools/list`（协议版本、工具 schema、被忽略的工具） |
+| GET | `/api/v1/mcp/audit?thread_id=&limit=` | 登录 | MCP 审计（服务端 + 客户端；普通用户只看自己的；参数已脱敏） |
+| GET | `/api/v1/tickets` · `/api/v1/tickets/{number}` | 登录 | 工单（本人 / admin）与状态流转事件（含审批人、审批时间） |

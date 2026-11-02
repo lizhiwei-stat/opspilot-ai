@@ -1,0 +1,26 @@
+flowchart LR
+  subgraph Browser["浏览器 (React)"]
+    UI["Agent 工作台<br/>审批队列 / 退回修改 / 工单结果 / MCP 审计"]
+  end
+  subgraph Backend["FastAPI 后端进程 (JWT 认证)"]
+    API["/api/v1/agent/*<br/>/api/v1/tickets, /mcp/audit, /mcp/servers"]
+    SVC["AgentService<br/>approve() 服务端校验 admin"]
+    G["LangGraph StateGraph<br/>plan → retrieve → agent → tools → collect →<br/>generate → verify → draft → approval(interrupt) →<br/>apply_approval → revise / respond"]
+    GUARD["ToolGuard<br/>白名单 · 计划内工具 · 次数/时间上限 · 幂等键"]
+    HUB["MCPHub (官方 SDK Client)<br/>服务器名校验 · 工具白名单 · schema 精确匹配<br/>输入/输出 Pydantic 校验 · 输出大小上限 · 超时"]
+    TOK["Caller token (HS256, _meta)<br/>aud=server · tool · args sha256 · jti · TTL 30s"]
+  end
+  subgraph MCP["MCP Server 子进程 (stdio, 最小环境: 无 LLM Key / 无 JWT 密钥)"]
+    K["opspilot-knowledge<br/>search_knowledge · get_document · list_knowledge_bases"]
+    T["opspilot-ticket<br/>get_ticket · list_tickets · create_ticket_draft ·<br/>update_ticket_status · revise_ticket_draft(仅后端)"]
+    D["opspilot-diagnostics<br/>query_system_logs · get_service_status · analyze_error_code"]
+  end
+  PG[("PostgreSQL<br/>tickets · ticket_drafts · approvals · ticket_events<br/>mcp_tool_audit · tool_calls · agent_runs<br/>langgraph.checkpoints")]
+  UI -- "Bearer JWT" --> API --> SVC --> G
+  G --> GUARD --> HUB
+  HUB -- "tools/list · tools/call + _meta token" --> K & T & D
+  TOK -.-> HUB
+  K & T & D -- "verify token → 重新加载用户 → ACL → 审计" --> PG
+  SVC --> PG
+  G -- "PostgresSaver" --> PG
+  HTTP["可选 Streamable HTTP<br/>仅 127.0.0.1 · Bearer · Origin 白名单 · Host 校验 · 64KiB"] -.-> D

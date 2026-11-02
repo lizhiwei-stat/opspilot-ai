@@ -21,7 +21,7 @@ flowchart LR
 
   subgraph Tools["MCP Server (Python SDK, 独立进程)"]
     T1[search_knowledge]
-    T2[query_mock_logs]
+    T2[query_system_logs]
     T3[get_ticket]
     T4[create_ticket_draft]
   end
@@ -72,7 +72,7 @@ sequenceDiagram
   G->>MCP: search_knowledge(query, user)  
   MCP->>DB: ACL 过滤 + 向量/全文 + RRF
   MCP-->>G: chunks + 引用位置
-  G->>MCP: query_mock_logs(order-service, ERROR, 1h)
+  G->>MCP: query_system_logs(order-service, ERROR, 1h)
   alt 工具超时/失败
     MCP-->>G: error → 重试 N 次 → 降级(仅文档证据, 置信度下调)
   else 成功

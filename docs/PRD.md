@@ -65,7 +65,7 @@ Bob 无权访问 `order-platform` 知识库：检索结果中不得出现该库�
 - 最大步数 / 最大工具调用次数；单工具超时、重试（指数退避）、失败降级；Human-in-the-loop（`interrupt` + `Command(resume=...)`）。
 
 ### C MCP 工具服务（第四阶段）
-基于 MCP Python SDK 的独立 Server，工具：`search_knowledge`、`query_mock_logs`、`get_ticket`、`create_ticket_draft`。
+基于 MCP Python SDK 的独立 Server，工具：`search_knowledge`、`query_mock_logs`（阶段 4 实现为 `query_system_logs`，另有 get_document、list_knowledge_bases、list_tickets、update_ticket_status、get_service_status、analyze_error_code，见 API.md）、`get_ticket`、`create_ticket_draft`。
 - Pydantic 定义输入输出；统一错误结构；调用方身份与权限校验；
 - 写操作只能产生**草稿**；正式创建工单只在审批 API 中由服务端执行。
 
