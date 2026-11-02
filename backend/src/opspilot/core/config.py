@@ -90,13 +90,13 @@ class Settings(BaseSettings):
     # hosts an answer may link to (only if the link is also in trusted evidence)
     qa_link_allowlist: tuple[str, ...] = ("opspilot.local", "corp.local")
     rerank_fusion_weight: float = Field(default=0.5, ge=0.0, le=1.0)  # reranker share
-    qa_min_evidence: float = Field(default=0.5, ge=0, le=1)
+    qa_min_evidence: float = Field(default=0.25, ge=0, le=1)  # dev-tuned (Stage 2: 0.5)
     qa_max_context_chunks: int = Field(default=4, ge=1, le=20)
     # Evidence signal: lexical = query-term coverage (Stage 2) | reranker = cross-encoder
     # relevance (only when OPSPILOT_RERANKER=cross_encoder) | auto = reranker if a model
     # reranker is active else lexical. Threshold for the reranker signal:
     qa_evidence: Literal["auto", "lexical", "reranker"] = "auto"
-    qa_min_rerank_score: float = Field(default=0.5, ge=0, le=1)
+    qa_min_rerank_score: float = Field(default=0.02, ge=0, le=1)  # dev-tuned, bge-reranker-base
     # "Anchor" terms = Latin product/tech names in the question (Java, Redis, MySQL...). If one
     # does not occur in any evidence chunk the question is about something the KB does not
     # cover -> refuse (fixes the Stage 2 false accepts q045/q048).
