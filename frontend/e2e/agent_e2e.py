@@ -41,7 +41,9 @@ def login(browser: Browser, url: str, email: str, pw: str) -> Page:
 def ask(page: Page, q: str, button: str = "运行") -> None:
     page.get_by_label("Agent 问题").fill(q)
     page.get_by_role("button", name=button).click()
-    expect(page.get_by_role("button", name=button)).to_be_enabled(timeout=30_000)
+    # label flips to 继续追问 once a thread exists; wait for the busy state to end
+    expect(page.get_by_role("button", name="执行中…")).to_have_count(0, timeout=30_000)
+    page.wait_for_timeout(300)
 
 
 def main() -> int:
