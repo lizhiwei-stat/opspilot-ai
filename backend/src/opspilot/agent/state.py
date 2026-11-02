@@ -130,3 +130,7 @@ class AgentState(TypedDict, total=False):
     usage: Annotated[dict[str, Any], _merge_dict]
     error: str | None
     status: RunStatus
+    deadline: float  # epoch seconds; per-turn wall-clock budget
+    last_entities: dict[str, list[str]]  # carried across turns for follow-ups ("它的状态呢")
+    agent_idle: bool  # the model proposed no (new) tool call this round
+    degraded: list[str]  # recoveries taken this turn (e.g. llm_timeout->rules)

@@ -11,7 +11,7 @@ import re
 
 import jieba
 
-ERROR_CODE = re.compile(r"\b(?:[A-Z]{2,6}-\d{3,5}|ERR_[A-Z_]{3,40})\b")
+ERROR_CODE = re.compile(r"\b(?:(?!TCK-)[A-Z]{2,6}-\d{3,5}|ERR_[A-Z_]{3,40})\b")
 TICKET_NO = re.compile(r"\bTCK-\d{4}\b")
 _LOG_WORDS = re.compile(
     r"日志|log|trace|报错记录|错误记录|最近.{0,6}(错误|报错|异常)|告警记录", re.I

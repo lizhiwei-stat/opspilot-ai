@@ -59,6 +59,7 @@ def assess(
     qa_gate: dict[str, Any],
     presence: Presence,
     tools_available: list[str],
+    required_tools: list[str] | None = None,
     judge: dict[str, Any] | None = None,
 ) -> Assessment:
     kb = [e for e in evidence if e["source"] == "kb"]
@@ -87,6 +88,9 @@ def assess(
         wanted.append("analyze_error_code")
     if intent == "ticket_query" and "get_ticket" not in tools_done:
         wanted.append("get_ticket")
+    for t in required_tools or []:  # tools the plan marked as required (e.g. logs)
+        if t not in tools_done and t not in wanted:
+            wanted.append(t)
     wanted = [t for t in wanted if t in tools_available]
 
     # --- 6. anchors (Latin names must occur in evidence)

@@ -94,6 +94,7 @@ class Settings(BaseSettings):
     agent_llm_max_tokens: int = Field(default=600, ge=16, le=8192)
     agent_llm_timeout_s: float = Field(default=30.0, ge=1, le=300)
     agent_max_steps: int = Field(default=24, ge=4, le=200)
+    agent_run_timeout_s: float = Field(default=60.0, ge=1, le=600)  # per-turn wall clock
     agent_max_tool_calls: int = Field(default=6, ge=0, le=50)
     agent_max_react_rounds: int = Field(default=3, ge=0, le=20)
     agent_max_llm_calls: int = Field(default=8, ge=1, le=100)
