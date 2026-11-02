@@ -51,7 +51,7 @@ class RunIn(BaseModel):
 
 
 class ApprovalIn(BaseModel):
-    decision: Literal["approved", "rejected"]
+    decision: Literal["approved", "rejected", "returned"]  # returned = 退回修改 (needs comment)
     comment: str = Field(default="", max_length=500)
 
 
@@ -86,6 +86,12 @@ def approve_run(
 ) -> dict[str, Any]:
     """Human-in-the-loop: resume an interrupted run with an admin decision."""
     return svc.approve(run_id, admin, body.decision, body.comment)
+
+
+@router.get("/approvals")
+def approval_queue(admin: AdminDep, svc: AgentDep) -> list[dict[str, Any]]:
+    """Admin approval queue: runs waiting at the approval interrupt (survives restarts)."""
+    return svc.pending_approvals(admin)
 
 
 @router.post("/runs/{run_id}/resume")

@@ -80,7 +80,9 @@ def test_approval_flow_over_http(api) -> None:
     url = f"/api/v1/agent/runs/{v['run_id']}/approval"
     assert api.post(url, headers=alice, json={"decision": "approved"}).status_code == 403
     r = api.post(url, headers=admin, json={"decision": "approved", "comment": "ok"})
-    assert r.status_code == 200 and r.json()["draft"]["status"] == "approved"
+    assert (
+        r.status_code == 200 and r.json()["draft"]["status"] == "executed"
+    )  # Stage 4: approval runs the business op
     assert api.post(url, headers=admin, json={"decision": "approved"}).status_code == 409
     rs = api.post(f"/api/v1/agent/runs/{v['run_id']}/resume", headers=alice)
     assert rs.status_code == 409

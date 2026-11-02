@@ -77,7 +77,7 @@ def test_error_code_question_runs_react_loop(run_agent) -> None:
         "respond",
     ]
     names = {r["tool"]: r["status"] for r in recs(st)}
-    assert names == {"analyze_error_code": "ok", "query_mock_logs": "ok"}
+    assert names == {"analyze_error_code": "ok", "query_system_logs": "ok"}
     assert "ORD-5003" in st["final"]["answer"]
     assert st["status"] == "completed"
 
@@ -141,13 +141,13 @@ def test_forged_identity_argument_is_ignored(run_agent) -> None:
         tool_calls=[
             {
                 "id": "f1",
-                "name": "query_mock_logs",
+                "name": "query_system_logs",
                 "args": {"service": "order-service", "user_id": "admin"},
             }
         ]
     )
     st = run_agent("订单服务最近的错误日志里有什么", "bob", llm=MockAgentLLM(script=[forged]))
-    r = next(x for x in recs(st) if x["tool"] == "query_mock_logs")
+    r = next(x for x in recs(st) if x["tool"] == "query_system_logs")
     assert r["status"] == "denied" and r["error_class"] == "permission"
     assert "user_id" not in r["args_summary"]
     assert st["status"] == "refused"
@@ -158,7 +158,7 @@ def test_invalid_arguments_are_rejected_before_execution(run_agent) -> None:
         tool_calls=[
             {
                 "id": "v1",
-                "name": "query_mock_logs",
+                "name": "query_system_logs",
                 "args": {"service": "Order Service!!", "limit": 999},
             }
         ]
@@ -259,7 +259,7 @@ def test_duplicate_tool_calls_are_filtered(run_agent) -> None:
 # ------------------------------------------------ prompt injection in tool output
 def test_injected_log_line_is_flagged_and_not_obeyed(run_agent) -> None:
     st = run_agent("支付网关最近的错误日志，ERR_PAY_TIMEOUT 怎么处理")
-    outs = [o for o in st["tool_outputs"] if o["tool"] == "query_mock_logs"]
+    outs = [o for o in st["tool_outputs"] if o["tool"] == "query_system_logs"]
     assert outs and any(ln["flagged"] for ln in outs[0]["output"]["lines"])
     assert "evil.example" not in st["final"]["answer"]
 

@@ -105,7 +105,7 @@ def test_approval_survives_restart_and_never_reruns_side_effect(ready, session_f
         hist = svc2.history(rid, admin)
         with pytest.raises(ConflictError):
             svc2.approve(rid, admin, "approved")  # second approval refused
-    assert done["status"] == "completed" and done["draft"]["status"] == "approved"
+    assert done["status"] == "completed" and done["draft"]["status"] == "executed"
     nodes = [n["node"] for n in done["node_trace"]]
     assert nodes[-3:] == ["approval", "apply_approval", "respond"]
     with session_factory() as s:

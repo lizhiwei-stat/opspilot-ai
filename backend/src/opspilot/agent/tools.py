@@ -186,6 +186,7 @@ class ToolContext:
     allowed: list[str]
     faults: dict[str, str] = field(default_factory=dict)
     attempts_seen: dict[str, int] = field(default_factory=dict)
+    user_role: str = "user"
 
 
 @dataclass
@@ -195,6 +196,7 @@ class ToolSpec:
     input_model: type[BaseModel]
     fn: Callable[[Session, User, BaseModel, ToolContext], BaseModel]
     side_effect: bool = False
+    server: str = ""  # Stage 4: owning MCP server (knowledge / ticket / diagnostics)
 
 
 def _load_user(s: Session, user_id: str) -> User:
@@ -388,21 +390,28 @@ SPECS: dict[str, ToolSpec] = {
             "在当前用户有权限的知识库中检索（第二阶段 RAG，混合检索+重排）。",
             SearchKnowledgeIn,
             _search,
+            server="knowledge",
         ),
         ToolSpec(
-            "query_mock_logs", "查询模拟系统日志（按服务、级别、错误码过滤）。", QueryLogsIn, _logs
+            "query_system_logs",
+            "查询系统日志（按服务、级别、错误码过滤）。",
+            QueryLogsIn,
+            _logs,
+            server="diagnostics",
         ),
         ToolSpec(
             "get_ticket",
             "按工单号查询已有工单（仅本人提交/负责或管理员可见）。",
             GetTicketIn,
             _ticket,
+            server="ticket",
         ),
         ToolSpec(
             "analyze_error_code",
             "分析错误码：所属服务、4xx/5xx、是否可重试，并在可访问知识库中查找说明。",
             AnalyzeErrorCodeIn,
             _error_code,
+            server="diagnostics",
         ),
         ToolSpec(
             "create_ticket_draft",
@@ -410,6 +419,7 @@ SPECS: dict[str, ToolSpec] = {
             CreateTicketDraftIn,
             _draft,
             side_effect=True,
+            server="ticket",
         ),
     ]
 }
@@ -453,7 +463,8 @@ def _result_summary(out: BaseModel) -> str:
         )
     if isinstance(out, TicketDraftOut):
         return f"draft {out.draft_id} status={out.status}"
-    return out.__class__.__name__
+    d = out.model_dump()
+    return f"{out.__class__.__name__}: " + json.dumps(d, ensure_ascii=False, default=str)[:160]
 
 
 @dataclass
@@ -469,6 +480,7 @@ class ToolGuard:
         self.ctx = ctx
 
     def run(self, name: str, raw_args: dict[str, Any], call_id: str) -> ToolOutcome:
+        self._call_id = call_id
         t0 = time.perf_counter()
         ctx = self.ctx
         spec = SPECS.get(name)
@@ -564,6 +576,23 @@ class ToolGuard:
             raise ToolUpstreamError("injected upstream failure")
         elif fault == "transient_once" and attempt == 1:
             raise ToolTransientError("injected transient failure")
+        if self.ctx.settings.agent_tool_transport == "mcp" and spec.server:
+            from opspilot.mcp.client import CallerCtx, get_hub
+
+            hub = get_hub(self.ctx.settings, self.ctx.session_factory)
+            return hub.call(
+                spec.server,
+                spec.name,
+                args.model_dump(mode="json"),
+                CallerCtx(
+                    user_id=self.ctx.user_id,
+                    role=self.ctx.user_role,
+                    thread_id=self.ctx.thread_id,
+                    run_id=self.ctx.run_id,
+                    call_id=self._call_id,
+                ),
+                timeout_s=self.ctx.settings.agent_tool_timeout_s,
+            )
         with self.ctx.session_factory() as s:
             user = _load_user(s, self.ctx.user_id)
             return spec.fn(s, user, args, self.ctx)
@@ -589,7 +618,9 @@ class ToolGuard:
                     ToolCall(
                         run_id=uuid.UUID(self.ctx.run_id),
                         tool_name=rec["tool"][:64],
-                        transport="inprocess",
+                        transport="mcp-stdio"
+                        if self.ctx.settings.agent_tool_transport == "mcp"
+                        else "inprocess",
                         arguments=_summary(raw_args),
                         result={
                             "summary": rec["result_summary"],
@@ -666,3 +697,48 @@ def make_tools(ctx_factory: Callable[[dict[str, Any]], ToolContext]) -> list[Str
             )
         )
     return tools
+
+
+# ------------------------------------------------------------------ Stage 4 read-only tools
+def _impl(name: str) -> Callable[[Session, User, BaseModel, ToolContext], BaseModel]:
+    def f(s: Session, user: User, a: BaseModel, ctx: ToolContext) -> BaseModel:
+        from opspilot.mcp import impl
+
+        return getattr(impl, name)(s, user, a, ctx)
+
+    return f
+
+
+from opspilot.mcp import contracts as _c  # noqa: E402  (contracts import the models above)
+
+for _spec in (
+    ToolSpec(
+        "get_document",
+        "读取一篇有权限访问的知识库文档（分块）。",
+        _c.GetDocumentIn,
+        _impl("get_document"),
+        server="knowledge",
+    ),
+    ToolSpec(
+        "list_knowledge_bases",
+        "列出当前用户可读的知识库。",
+        _c.ListKnowledgeBasesIn,
+        _impl("list_knowledge_bases"),
+        server="knowledge",
+    ),
+    ToolSpec(
+        "list_tickets",
+        "列出当前用户可见的工单。",
+        _c.ListTicketsIn,
+        _impl("list_tickets"),
+        server="ticket",
+    ),
+    ToolSpec(
+        "get_service_status",
+        "查询服务健康状态（基于近期日志的模拟信号）。",
+        _c.GetServiceStatusIn,
+        _impl("get_service_status"),
+        server="diagnostics",
+    ),
+):
+    SPECS[_spec.name] = _spec

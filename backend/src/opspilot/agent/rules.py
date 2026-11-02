@@ -54,9 +54,16 @@ def explicit_ticket_request(text: str) -> bool:
     return bool(_TICKET_ACTION.search(text))
 
 
+_INCIDENT = re.compile(r"日志|文档|分析|诊断|排查|根因|关联")
+
+
 def rule_intent(text: str) -> str:
     e = entities(text)
     if explicit_ticket_request(text):
+        # Stage 4: "diagnose, then file a ticket" -> full pipeline (RAG + logs + error code
+        # + solution) before the draft; a bare "create a ticket" stays ticket_action
+        if e["error_codes"] or _INCIDENT.search(text):
+            return "incident_ticket"
         return "ticket_action"
     if e["tickets"] or _TICKET_QUERY.search(text):
         return "ticket_query"

@@ -19,6 +19,7 @@ Intent = Literal[
     "troubleshoot",  # diagnose an incident: KB + logs + error codes
     "ticket_query",  # look up an existing ticket
     "ticket_action",  # create a ticket draft (side effect -> approval branch)
+    "incident_ticket",  # Stage 4: KB + logs + error code -> solution -> draft -> approval
     "chitchat",
     "out_of_scope",
 ]

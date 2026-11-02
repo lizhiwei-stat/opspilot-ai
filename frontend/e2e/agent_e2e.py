@@ -84,9 +84,9 @@ def main() -> int:
             expect(trace).to_contain_text(n)
         tools = page.get_by_label("tool-calls")
         expect(tools).to_contain_text("analyze_error_code")
-        expect(tools).to_contain_text("query_mock_logs")
+        expect(tools).to_contain_text("query_system_logs")
         expect(page.get_by_label("引用")).to_be_visible()
-        checks["react_tools"] = "analyze_error_code + query_mock_logs, cited answer, mock label"
+        checks["react_tools"] = "analyze_error_code + query_system_logs, cited answer, mock label"
         shot(page, a.screenshots, "stage3_agent_tools.png")
 
         page.get_by_role("button", name="新会话").click()

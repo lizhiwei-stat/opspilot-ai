@@ -5,6 +5,10 @@
                                                  collect -> assess (ReAct loop, bounded)
                                                  assess -clarify/refuse-> respond / refuse
     ticket_action: plan -> agent -> tools -> collect -> approval (interrupt)
+    incident_ticket (Stage 4): plan -> retrieve -> assess -> agent -> tools (MCP: logs, error
+        code, service status) -> collect -> assess -> generate -> verify -> draft (server-built,
+        Ticket MCP) -> approval (interrupt) -> apply_approval -> [update_ticket_status via
+        Ticket MCP | revise -> approval ...] -> respond
                    -> apply_approval -> respond
     any node --(exception | max steps | deadline)--> fail_safe
 
@@ -36,9 +40,9 @@ from opspilot.agent import rules
 from opspilot.agent.evidence import assess as assess_evidence
 from opspilot.agent.llm import AgentLLM, AgentLLMError, MockAgentLLM, Usage
 from opspilot.agent.state import AgentState, Evidence, FinalAnswer
-from opspilot.agent.tools import DATA, ToolContext, make_tools, openai_tool_schemas
+from opspilot.agent.tools import DATA, ToolContext, ToolGuard, make_tools, openai_tool_schemas
 from opspilot.core.config import Settings
-from opspilot.db.models import Approval, TicketDraft, User
+from opspilot.db.models import Approval, TicketDraft, ToolCall, User
 from opspilot.llm.mock import MockLLM
 from opspilot.rag.policy import check_answer, verify_quote
 from opspilot.rag.sanitize import sanitize
@@ -154,7 +158,7 @@ def _evidence_from_tools(state: AgentState) -> list[dict[str, Any]]:
             out.append(
                 Evidence(id=cid, source="tool", title="analyze_error_code", text=txt).model_dump()
             )
-        elif tool == "query_mock_logs":
+        elif tool == "query_system_logs":
             lines = o.get("lines", [])[-5:]
             txt = (
                 f"{o['service']} 最近 {o['total']} 条日志，按错误码统计 {o['by_code']}。"
@@ -167,7 +171,7 @@ def _evidence_from_tools(state: AgentState) -> list[dict[str, Any]]:
                 Evidence(
                     id=cid,
                     source="tool",
-                    title=f"query_mock_logs:{o['service']}",
+                    title=f"query_system_logs:{o['service']}",
                     text=txt,
                     flagged=any(ln.get("flagged") for ln in o.get("lines", [])),
                 ).model_dump()
@@ -340,7 +344,9 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
             if ent.get("tickets") and c.intent == "knowledge_qa":
                 c.intent = "ticket_query"  # type: ignore[assignment]
         # server-side guard: a side-effecting intent needs the USER's explicit request
-        if c.intent == "ticket_action" and not rules.explicit_ticket_request(q):
+        if c.intent in ("ticket_action", "incident_ticket") and not rules.explicit_ticket_request(
+            q
+        ):
             c.intent = rules.rule_intent(q)  # type: ignore[assignment]
         c.entities = ent
         return Command(
@@ -392,11 +398,15 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
             steps.append(
                 {"action": "tool", "tool": "analyze_error_code", "reason": "问题包含错误码"}
             )
-        if intent == "troubleshoot" and (
-            rules.wants_logs(state["question"]) or ent.get("error_codes")
+        incident = intent == "incident_ticket"
+        if incident or (
+            intent == "troubleshoot"
+            and (rules.wants_logs(state["question"]) or ent.get("error_codes"))
         ):
-            allowed.append("query_mock_logs")
-            steps.append({"action": "tool", "tool": "query_mock_logs", "reason": "需要日志证据"})
+            allowed.append("query_system_logs")
+            steps.append({"action": "tool", "tool": "query_system_logs", "reason": "需要日志证据"})
+        if incident:
+            allowed.append("get_service_status")
         if intent == "ticket_query" or ent.get("tickets"):
             allowed.append("get_ticket")
             steps.append({"action": "tool", "tool": "get_ticket", "reason": "查询工单"})
@@ -407,6 +417,10 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
             )
             steps.append({"action": "approval", "reason": "副作用操作需人工审批"})
         steps.append({"action": "generate", "reason": "基于证据生成并核验引用"})
+        if incident:
+            # the draft is composed SERVER-SIDE from the verified solution (draft node); the
+            # model is never offered create_ticket_draft in this pipeline
+            steps.append({"action": "approval", "reason": "解决方案核验后生成草稿并提交人工审批"})
         # ticket lookups / actions do not need the KB; everything else retrieves first
         needs_rag = intent not in ("ticket_action", "ticket_query")
         if not needs_rag:
@@ -679,6 +693,7 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
             user_id=state["user_id"],
             allowed=list((state.get("plan") or {}).get("allowed_tools", [])),
             faults=dict(deps.faults or {}),
+            user_role=str(state.get("user_role") or "user"),
         )
 
     tool_node = ToolNode(make_tools(ctx_factory), handle_tool_errors=True)
@@ -755,6 +770,184 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
             return Command(update=upd, goto="refuse")
         return Command(update=upd, goto="assess")
 
+    # ------------------------------------------------------------- Stage 4 helpers
+    def backend_tool(state: AgentState, tool: str, args: dict[str, Any], as_user: User) -> Any:
+        """Backend-initiated MCP call (never offered to the model): business operation after
+        approval, draft revision. Identity = the given DB user, not anything in the state
+        the model could influence. Recorded in tool_records like any other call."""
+        from opspilot.mcp.contracts import SERVER_TOOLS, TOOL_SERVER
+
+        server = TOOL_SERVER[tool]
+        in_model, _ = SERVER_TOOLS[server][tool]
+        call_id = f"srv-{tool}-{uuid.uuid4().hex[:8]}"
+        t0 = time.perf_counter()
+        status, err_cls, out, err = "ok", None, None, None
+        try:
+            if s.agent_tool_transport == "mcp":
+                from opspilot.mcp.client import CallerCtx, get_hub
+
+                out = get_hub(s, deps.session_factory).call(
+                    server,
+                    tool,
+                    args,
+                    CallerCtx(
+                        str(as_user.id),
+                        as_user.role,
+                        state["thread_id"],
+                        state.get("run_id"),
+                        call_id,
+                    ),
+                )
+            else:
+                from opspilot.mcp import impl
+
+                with deps.session_factory() as sess:
+                    u = sess.get(User, as_user.id)
+                    out = getattr(impl, tool)(
+                        sess,
+                        u,
+                        in_model.model_validate(args),
+                        ToolContext(
+                            s,
+                            deps.session_factory,
+                            deps.embedder,
+                            state.get("run_id"),
+                            state["thread_id"],
+                            str(as_user.id),
+                            [tool],
+                        ),
+                    )
+        except Exception as exc:
+            from opspilot.agent.tools import classify
+
+            status, err_cls, err = "error", classify(exc), exc
+            if "conflict" in type(exc).__name__.lower():
+                err_cls = "conflict"
+        rec = {
+            "turn": state.get("turn", 0),
+            "call_id": call_id,
+            "tool": tool,
+            "args_summary": {k: str(v)[:80] for k, v in args.items()},
+            "status": status,
+            "error_class": err_cls,
+            "attempts": 1,
+            "duration_ms": round((time.perf_counter() - t0) * 1000, 2),
+            "result_summary": (
+                json.dumps(out.model_dump(), ensure_ascii=False)[:160]
+                if out
+                else f"{err_cls}: {err}"
+            ),
+            "idempotency_key": getattr(out, "idempotency_key", None),
+            "server": server,
+            "initiator": "backend",
+            "acting_user": str(as_user.id),
+        }
+        if state.get("run_id"):
+            with deps.session_factory() as sess:
+                sess.add(
+                    ToolCall(
+                        run_id=uuid.UUID(str(state["run_id"])),
+                        tool_name=tool,
+                        transport="mcp-stdio" if s.agent_tool_transport == "mcp" else "inprocess",
+                        arguments=rec["args_summary"],
+                        result={
+                            "summary": rec["result_summary"],
+                            "deduplicated": bool(getattr(out, "deduplicated", False)),
+                            "initiator": "backend",
+                        }
+                        if out is not None
+                        else None,
+                        status="ok" if status == "ok" else "error",
+                        attempt=1,
+                        error=err_cls,
+                        duration_ms=int(rec["duration_ms"]),
+                        caller_id=as_user.id,
+                        call_id=call_id[:64],
+                    )
+                )
+                sess.commit()
+        return out, rec, err
+
+    def _draft_args(state: AgentState) -> dict[str, Any]:
+        """Draft composed server-side from the VERIFIED answer + tool facts. The model does
+        not author it, so tool output / injected text cannot steer what gets filed."""
+        ent = state["classification"]["entities"]
+        outs = _turn_items(state, "tool_outputs")
+        code = (ent.get("error_codes") or [None])[0]
+        svc = (ent.get("services") or [None])[0]
+        status_by_svc = {}
+        log_lines = []
+        for o in outs:
+            out = o["output"]
+            if o["tool"] == "analyze_error_code" and out.get("service"):
+                svc = svc or out["service"]
+            if o["tool"] == "get_service_status":
+                status_by_svc[out["service"]] = out["status"]
+            if o["tool"] == "query_system_logs":
+                log_lines.append(f"{out['service']}：{out['total']} 条，按错误码 {out['by_code']}")
+        health = status_by_svc.get(svc or "", "unknown")
+        priority = {"down": "P1", "degraded": "P2"}.get(health, "P3")
+        answer = re.sub(
+            r"^【Mock 智能体[^】]*】\s*", "", (state.get("final") or {}).get("answer", "")
+        )
+        cites = (state.get("final") or {}).get("citations") or []
+        desc = (
+            f"【现象】{state['question']}\n"
+            f"【服务状态】{svc or '未知'}：{health}\n"
+            f"【日志】{'；'.join(log_lines) or '无'}\n"
+            f"【分析与建议（已核验引用）】\n{answer}\n"
+            f"【证据】{'；'.join(sorted({c['title'] for c in cites}))}"
+        )
+        args: dict[str, Any] = {
+            "title": f"{code or '故障'} {svc or ''} 排查与处理".replace("  ", " ")[:120],
+            "description": sanitize(desc).text[:2000],
+            "priority": priority,
+            "category": "incident",
+        }
+        if svc:
+            args["service"] = svc
+        return args
+
+    @node("draft", ("approval", "refuse"))
+    def draft(state: AgentState) -> Command:
+        ctx = ctx_factory(state)
+        ctx.allowed = [*ctx.allowed, "create_ticket_draft"]  # server-side grant for this node
+        call_id = f"srv-draft-{state.get('turn', 0)}"
+        outcome = ToolGuard(ctx).run("create_ticket_draft", _draft_args(state), call_id)
+        rec = {**outcome.record, "turn": state.get("turn", 0), "initiator": "backend"}
+        upd: dict[str, Any] = {"tool_records": [rec], "_detail": {"status": outcome.status}}
+        if outcome.output is None:
+            upd["assessment"] = {
+                "decision": "refuse",
+                "reasons": [f"draft_not_created:{outcome.status}:{rec.get('error_class')}"],
+                "missing": ["工单草稿未能生成"],
+            }
+            return Command(update=upd, goto="refuse")
+        d = {**outcome.output, "revision": 1}
+        solution = (state.get("final") or {}).get("answer", "")
+        upd.update(
+            {
+                "tool_outputs": [
+                    {
+                        "turn": state.get("turn", 0),
+                        "call_id": call_id,
+                        "tool": "create_ticket_draft",
+                        "output": outcome.output,
+                    }
+                ],
+                "draft": d,
+                "status": "awaiting_approval",
+                "final": _final(
+                    "awaiting_approval",
+                    f"{solution}\n\n已生成待审核工单草稿 {d['draft_id'][:8]}…（第 1 版），"
+                    "等待管理员审批。",
+                    citations=(state.get("final") or {}).get("citations") or [],
+                ),
+            }
+        )
+        upd["_detail"]["draft_id"] = d["draft_id"]
+        return Command(update=upd, goto="approval")
+
     def approval(state: AgentState) -> Command:
         # NOTE: no side effects before interrupt(): this node re-runs from the top on resume
         t0 = time.perf_counter()
@@ -763,11 +956,19 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
             {
                 "type": "ticket_draft_approval",
                 "draft_id": d.get("draft_id"),
+                "revision": d.get("revision", 1),
                 "payload_sha256": d.get("payload_sha256"),
                 "question": state["question"],
             }
         )
-        if not isinstance(decision, dict):
+        # only the server (AgentService.approve, admin-checked) produces resume payloads;
+        # anything else (missing reviewer, unknown decision) is treated as a rejection
+        if not isinstance(decision, dict) or decision.get("decision") not in (
+            "approved",
+            "rejected",
+            "returned",
+            "expired",
+        ):
             decision = {"decision": "rejected", "comment": "invalid resume payload"}
         return Command(
             update={
@@ -780,14 +981,14 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
             goto="apply_approval",
         )
 
-    @node("apply_approval", ("respond",))
+    @node("apply_approval", ("respond", "revise"))
     def apply_approval(state: AgentState) -> Command:
         d, ap = state["draft"] or {}, state.get("approval") or {}
         did = uuid.UUID(d["draft_id"])
         verdict = ap.get("decision")
         with deps.session_factory() as sess:
-            draft = sess.get(TicketDraft, did)
-            if draft is None:
+            draft_row = sess.get(TicketDraft, did)
+            if draft_row is None:
                 raise RuntimeError("draft missing")
             if verdict == "expired":
                 sess.execute(
@@ -812,13 +1013,15 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
             reviewer = sess.get(User, uuid.UUID(str(ap.get("reviewer_id"))))
             if (
                 reviewer is None
+                or not reviewer.is_active
                 or reviewer.role != "admin"
-                or verdict not in ("approved", "rejected")
+                or verdict not in ("approved", "rejected", "returned")
             ):
                 raise PermissionError("approval requires an admin reviewer and a valid decision")
             existing = sess.scalar(select(Approval).where(Approval.draft_id == did))
-            if existing is None and draft.status == "pending_approval":
-                # idempotent: conditional update + unique(draft_id) -> applied at most once
+            applied = False
+            if existing is None and draft_row.status == "pending_approval":
+                # conditional update + unique(draft_id): a decision is recorded at most once
                 n = sess.execute(
                     update(TicketDraft)
                     .where(TicketDraft.id == did, TicketDraft.status == "pending_approval")
@@ -831,27 +1034,140 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
                             decision=verdict,
                             reviewer_id=reviewer.id,
                             comment=(ap.get("comment") or "")[:500],
-                            payload_sha256=draft.payload_sha256,
+                            payload_sha256=draft_row.payload_sha256,
                         )
                     )
                 sess.commit()
                 applied = n == 1
+            sess.refresh(draft_row)
+            appr = sess.scalar(select(Approval).where(Approval.draft_id == did))
+            status = draft_row.status
+            revision = draft_row.revision
+            result: dict[str, Any] = {
+                "status": status,
+                "applied_now": applied,
+                "approval_id": str(appr.id) if appr else None,
+                "decision": appr.decision if appr else None,
+                "reviewer_id": str(appr.reviewer_id) if appr else None,
+                "decided_at": appr.decided_at.isoformat() if appr else None,
+                "revision": revision,
+            }
+            reviewer_email = reviewer.email
+            sess.expunge(reviewer)
+        recs: list[dict[str, Any]] = []
+        if status in ("approved", "executed") and result["decision"] == "approved":
+            # business operation: the Ticket MCP server re-checks the approval in the DB and
+            # executes it exactly once (repeat -> deduplicated, same ticket)
+            out, rec, err = backend_tool(
+                state,
+                "update_ticket_status",
+                {"draft_id": str(did), "approval_id": str(result["approval_id"])},
+                reviewer,
+            )
+            recs.append(rec)
+            if out is None:
+                result["business_op"] = {"ok": False, "error": f"{rec['error_class']}: {err}"[:200]}
+                return Command(
+                    update={
+                        "draft_result": result,
+                        "tool_records": recs,
+                        "final": _final(
+                            "failed",
+                            "审批已通过，但执行工单操作失败（已记录，可重试恢复）。",
+                            refusal_reason="business_op_failed",
+                        ),
+                        "status": "failed",
+                        "_status": "error",
+                        "_detail": {"draft": status, "business_op": "failed"},
+                    },
+                    goto="respond",
+                )
+            result["business_op"] = {"ok": True, **out.model_dump()}
+            result["ticket_number"] = out.ticket_number
+            msg = (
+                f"审批通过（审批人 {reviewer_email}），"
+                f"已通过 Ticket MCP 创建工单 {out.ticket_number}"
+                f"（状态 {out.status}）。" + ("（重复执行已去重）" if out.deduplicated else "")
+            )
+        elif status == "returned":
+            if revision > s.mcp_max_revisions:
+                msg = "草稿被退回，但已达到最大修改次数，流程结束，未执行任何操作。"
             else:
-                applied = False
-            sess.refresh(draft)
-            status = draft.status
-        msg = {
-            "approved": "草稿已审批通过（第三阶段仅记录审批；真实建单在第四阶段通过 MCP 执行）。",
-            "rejected": "草稿已被驳回，未执行任何操作。",
-        }.get(status, f"草稿状态：{status}")
+                return Command(
+                    update={
+                        "draft_result": result,
+                        "_detail": {"draft": "returned", "revision": revision},
+                    },
+                    goto="revise",
+                )
+        elif status == "rejected":
+            msg = "草稿已被驳回，未执行任何操作。"
+        else:
+            msg = f"草稿状态：{status}，未执行任何操作。"
         return Command(
             update={
-                "draft_result": {"status": status, "applied_now": applied},
+                "draft_result": result,
+                "tool_records": recs,
                 "final": _final("answered", msg),
                 "status": "completed",
-                "_detail": {"draft": status, "applied_now": applied},
+                "_detail": {
+                    "draft": status,
+                    "applied_now": applied,
+                    "ticket": result.get("ticket_number"),
+                },
             },
             goto="respond",
+        )
+
+    @node("revise", ("approval", "respond"))
+    def revise(state: AgentState) -> Command:
+        """Return-for-revision: new draft version that incorporates the reviewer's comment
+        (created by the Ticket MCP server; idempotent per parent + revision)."""
+        d, ap = state["draft"] or {}, state.get("approval") or {}
+        with deps.session_factory() as sess:
+            parent = sess.get(TicketDraft, uuid.UUID(d["draft_id"]))
+            owner = sess.get(User, uuid.UUID(state["user_id"]))
+            if parent is None or owner is None:
+                raise RuntimeError("draft or owner missing")
+            comment = sanitize((ap.get("comment") or "").strip()).text[:400] or "（无意见）"
+            args = {
+                "parent_draft_id": str(parent.id),
+                "title": parent.title,
+                "description": (parent.description + f"\n【审批意见 r{parent.revision}】{comment}")[
+                    -2000:
+                ],
+                "priority": parent.priority,
+            }
+            sess.expunge(owner)
+        out, rec, err = backend_tool(state, "revise_ticket_draft", args, owner)
+        if out is None:
+            return Command(
+                update={
+                    "tool_records": [rec],
+                    "final": _final(
+                        "failed", "草稿修订失败，流程结束。", refusal_reason="revise_failed"
+                    ),
+                    "status": "failed",
+                    "_status": "error",
+                    "_detail": {"error": str(err)[:120]},
+                },
+                goto="respond",
+            )
+        nd = {**out.model_dump(), "revision": int(d.get("revision", 1)) + 1}
+        return Command(
+            update={
+                "tool_records": [rec],
+                "draft": nd,
+                "approval": None,
+                "status": "awaiting_approval",
+                "final": _final(
+                    "awaiting_approval",
+                    f"已按审批意见生成草稿第 {nd['revision']} 版 {nd['draft_id'][:8]}…，"
+                    "等待再次审批。",
+                ),
+                "_detail": {"draft_id": nd["draft_id"], "revision": nd["revision"]},
+            },
+            goto="approval",
         )
 
     @node("generate", ("verify",))
@@ -891,7 +1207,7 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
             goto="verify",
         )
 
-    @node("verify", ("respond", "refuse"))
+    @node("verify", ("respond", "refuse", "draft"))
     def verify(state: AgentState) -> Command:
         f, evs = state["final"], state.get("evidence") or []
         ans = f["answer"]
@@ -943,8 +1259,10 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
             if not (llm.is_mock or "generate:" in " ".join(state.get("degraded") or []))
             else f"{MOCK_BANNER}\n{ans}"
         )
+        nxt = "draft" if state["classification"]["intent"] == "incident_ticket" else "respond"
         return Command(
-            update={"final": {**f, "answer": out}, "_detail": {"ok": True}}, goto="respond"
+            update={"final": {**f, "answer": out}, "_detail": {"ok": True, "next": nxt}},
+            goto=nxt,
         )
 
     @node("respond", (END,))
@@ -1023,6 +1341,8 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
         refuse,
         fail_safe,
     ):
+        g.add_node(fn.__name__, fn, destinations=fn._destinations)  # type: ignore[attr-defined]
+    for fn in (draft, revise):
         g.add_node(fn.__name__, fn, destinations=fn._destinations)  # type: ignore[attr-defined]
     g.add_node("approval", approval, destinations=("apply_approval",))
     g.add_node("tools", tool_node)

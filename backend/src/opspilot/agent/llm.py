@@ -148,8 +148,9 @@ class MockAgentLLM:
                 add("search_knowledge", {"query": question, "top_k": 10})
         for code in ent.get("error_codes", []):
             add("analyze_error_code", {"code": code})
-        if hint.get("intent") == "troubleshoot" and (
-            rules.wants_logs(question) or ent.get("error_codes")
+        incident = hint.get("intent") == "incident_ticket"
+        if (hint.get("intent") == "troubleshoot" or incident) and (
+            rules.wants_logs(question) or ent.get("error_codes") or incident
         ):
             svcs = list(ent.get("services", []))
             for code in ent.get("error_codes", []):
@@ -157,7 +158,9 @@ class MockAgentLLM:
                     if code.startswith(pre) and svc not in svcs:
                         svcs.append(svc)
             for svc in svcs[:2]:
-                add("query_mock_logs", {"service": svc, "level": "ERROR"})
+                add("query_system_logs", {"service": svc, "level": "ERROR"})
+                if incident:
+                    add("get_service_status", {"service": svc})
         for t in ent.get("tickets", []):
             add("get_ticket", {"ticket_number": t})
         if hint.get("intent") == "ticket_action" and not any(
@@ -225,7 +228,8 @@ SYSTEM_DECIDE = (
 )
 SYSTEM_CLASSIFY = (
     "把运维问题分类，只输出 JSON："
-    '{"intent": "knowledge_qa|troubleshoot|ticket_query|ticket_action|chitchat|out_of_scope"}'
+    '{"intent": "knowledge_qa|troubleshoot|ticket_query|ticket_action|incident_ticket|'
+    'chitchat|out_of_scope"}'
 )
 SYSTEM_GENERATE = (
     "你是企业运维知识助手。只能依据下面编号的证据作答，"

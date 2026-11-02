@@ -189,8 +189,10 @@ class AgentService:
     def approve(self, run_id: uuid.UUID, reviewer: User, decision: str, comment: str = "") -> dict:
         if reviewer.role != "admin":
             raise ForbiddenError("approval requires admin")
-        if decision not in ("approved", "rejected"):
-            raise ConflictError("decision must be approved or rejected")
+        if decision not in ("approved", "rejected", "returned"):
+            raise ConflictError("decision must be approved, rejected or returned")
+        if decision == "returned" and not comment.strip():
+            raise ConflictError("return-for-revision needs a comment for the author")
         with self.sf() as sess:
             run = self._load(sess, run_id, reviewer)
             if run.status != "awaiting_approval":
@@ -251,6 +253,9 @@ class AgentService:
                         "title": d.title,
                         "priority": d.priority,
                         "service": d.service,
+                        "description": d.description,
+                        "revision": d.revision,
+                        "parent_draft_id": str(d.parent_draft_id) if d.parent_draft_id else None,
                     }
             return {
                 "run_id": str(run.id),
@@ -286,6 +291,7 @@ class AgentService:
                 ],
                 "pending_approval": a.get("interrupt"),
                 "draft": draft,
+                "draft_result": a.get("draft_result"),
                 "usage": {
                     "tokens_in": run.prompt_tokens,
                     "tokens_out": run.completion_tokens,
@@ -316,6 +322,20 @@ class AgentService:
                 }
                 for r in sess.scalars(q)
             ]
+
+    def pending_approvals(self, admin: User) -> list[dict[str, Any]]:
+        """Approval queue (admin): every run still interrupted at the approval node. Durable:
+        after a backend restart the same list comes back from agent_runs + the checkpointer."""
+        if admin.role != "admin":
+            raise ForbiddenError("approval queue requires admin")
+        with self.sf() as sess:
+            runs = sess.scalars(
+                select(AgentRun)
+                .where(AgentRun.status == "awaiting_approval")
+                .order_by(AgentRun.created_at)
+            ).all()
+            ids = [r.id for r in runs]
+        return [self.view(i, admin) for i in ids]
 
     def history(self, run_id: uuid.UUID, user: User) -> list[dict[str, Any]]:
         """Checkpoint history of the run's thread (durable, from Postgres)."""

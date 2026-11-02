@@ -30,6 +30,9 @@ def make_settings(**overrides: object) -> Settings:
         # tests call checkpoint.setup() explicitly (CREATE INDEX CONCURRENTLY would wait on
         # fixture sessions that are idle in transaction)
         "agent_checkpoint_auto_setup": False,
+        # Stage 3 graph tests call tools in-process; Stage 4 tests (tests/mcp, stage4 flow)
+        # opt into the real MCP transport explicitly
+        "agent_tool_transport": "inprocess",
     }
     base.update(overrides)
     return Settings(_env_file=None, **base)  # type: ignore[arg-type]

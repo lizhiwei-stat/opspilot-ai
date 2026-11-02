@@ -74,7 +74,7 @@ md("## 6. 权限：普通用户查看他人工单 → 服务端 ACL 返回 not_f
 code("""show(svc.start(U["alice"], "查一下工单 TCK-0002 的状态"))""")
 md("## 7. 工具故障与降级（故障注入，仅测试/演示）")
 code("""fs = settings.model_copy(update={"agent_fault_injection": True})
-svc_f = AgentService(fs, sf, MockEmbedding(), PostgresSaver(pool), llm=MockAgentLLM(), faults={"query_mock_logs": "timeout"})
+svc_f = AgentService(fs, sf, MockEmbedding(), PostgresSaver(pool), llm=MockAgentLLM(), faults={"query_system_logs": "timeout"})
 show(svc_f.start(U["alice"], "订单服务最近的错误日志里有什么"))""")
 md("## 8. 多轮记忆（同一 thread，追问用代词）")
 code("""v1 = svc.start(U["alice"], "查一下工单 TCK-0001 的状态")
