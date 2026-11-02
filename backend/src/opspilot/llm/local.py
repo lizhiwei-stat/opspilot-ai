@@ -123,6 +123,7 @@ class CrossEncoderReranker:
     def __init__(self, *, model_id: str, revision: str, max_length: int = 512, threads: int = 8):
         st, torch = _import_st()
         torch.set_num_threads(threads)
+        self._identity = torch.nn.Identity()
         t0 = time.perf_counter()
         try:
             self._m = st.CrossEncoder(
@@ -143,7 +144,11 @@ class CrossEncoderReranker:
             [(query, p) for p in passages],
             convert_to_numpy=True,
             show_progress_bar=False,
-            activation_fn=None,
+            # NOTE: activation_fn=None means "use the model default" (Sigmoid for
+            # num_labels=1) in sentence-transformers 5.x, not "raw logits". Passing None
+            # and applying our own sigmoid squashed every score into (0.5, 0.73) -- the
+            # Stage 2.5 double-sigmoid bug. Identity gives raw logits; sigmoid once here.
+            activation_fn=self._identity,
         )
         return [round(1.0 / (1.0 + math.exp(-float(x))), 6) for x in logits]
 
