@@ -50,13 +50,8 @@ Base URL：`http://localhost:8000`。交互式文档：`/docs`（Swagger）、`/
 
 🔜 知识库创建 / 授权管理接口（`POST /knowledge-bases`、`PUT/DELETE …/permissions/{user_id}`）放在阶段 5 管理界面，目前由种子脚本创建。
 
-## Agent（阶段 3–4）
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| POST | `/api/v1/agent/runs` | 发起运行；`Accept: text/event-stream` 时流式推送节点事件 |
-| GET | `/api/v1/agent/runs` · `/{run_id}` | 运行列表 / 详情（含 steps、tool_calls、引用） |
-| GET | `/api/v1/agent/runs/{run_id}/events` | SSE 轨迹回放 |
-| POST | `/api/v1/agent/runs/{run_id}/resume` | 从 checkpoint 恢复（审批后或中断后） |
+## Agent（原设计，已被下方阶段 3 实现取代）
+SSE 流式事件（`text/event-stream`、`/events`）**尚未实现**，留待后续阶段；当前实现见下节。
 
 ## 工单与审批（阶段 4）
 | 方法 | 路径 | 权限 | 说明 |
@@ -66,6 +61,20 @@ Base URL：`http://localhost:8000`。交互式文档：`/docs`（Swagger）、`/
 | POST | `/api/v1/ticket-drafts/{id}/approve` · `/reject` | admin | 写 `approvals`；批准后服务端校验哈希并创建工单，恢复 Agent |
 | GET | `/api/v1/tickets` · `/{id}` | 登录 | 工单列表 / 详情 |
 | PATCH | `/api/v1/tickets/{id}` | admin | 状态流转（修改类 Agent 操作同样需草稿 + 审批） |
+
+## Agent（阶段 3 ✅ 已实现）
+所有接口需登录（Bearer JWT）。Mock 模式下响应含 `is_mock: true` 与提示文本。
+
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| POST | `/api/v1/agent/runs` | 登录 | 发起一轮：`{"question": "...", "thread_id": null}`；传入已有 `thread_id` 即多轮追问（只能续自己的会话；该会话运行中或待审批时返回 409） |
+| GET | `/api/v1/agent/runs` | 登录 | 本人运行列表（admin 可见全部） |
+| GET | `/api/v1/agent/runs/{run_id}` | 本人/admin | 运行详情：status、final_status、answer、citations、node_trace、tool_calls（含 deduplicated）、evidence、assessment、usage（tokens/耗时/费用）、degraded、draft |
+| GET | `/api/v1/agent/runs/{run_id}/history` | 本人/admin | 该 thread 的检查点历史（来自 PostgresSaver） |
+| POST | `/api/v1/agent/runs/{run_id}/approval` | **admin** | `{"decision": "approved"\|"rejected", "comment": ""}`；仅 `awaiting_approval` 状态可用；普通用户 403，重复审批 409，超过 24h 自动 expired |
+| POST | `/api/v1/agent/runs/{run_id}/resume` | 本人/admin | 进程崩溃后从最后一个检查点继续（仅当该运行仍有待执行节点且 run_id 匹配） |
+
+运行状态：`running` · `awaiting_approval` · `completed` · `refused` · `failed` · `expired`；最终答案状态 `final_status`：answered / refused / clarify / awaiting_approval / failed。
 
 ## 评测与看板（阶段 5–6）
 | 方法 | 路径 | 说明 |
