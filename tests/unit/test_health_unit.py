@@ -34,4 +34,6 @@ def test_readiness_overall_deadline() -> None:
     elapsed = time.perf_counter() - t0
     assert elapsed < 1.0
     assert report["status"] == "not_ready" and report["timed_out"] is True
-    assert all("timeout" in c["detail"] for c in report["checks"])  # type: ignore[union-attr]
+    by = {c["name"]: c for c in report["checks"]}  # type: ignore[union-attr]
+    assert "timeout" in by["database"]["detail"] and not by["database"]["ok"]
+    assert by["llm"]["ok"] and by["embedding"]["ok"]

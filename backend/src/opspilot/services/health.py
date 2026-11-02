@@ -104,11 +104,13 @@ class HealthService:
         except FutureTimeout:
             elapsed = round((time.perf_counter() - start) * 1000, 2)
             detail = f"timeout: readiness checks exceeded {self.timeout_s}s"
-            return {
-                "status": "not_ready",
-                "checks": [
-                    asdict(CheckResult(n, False, elapsed, detail))
-                    for n in ("database", "pgvector", "migrations", "llm", "embedding")
-                ],
-                "timed_out": True,
-            }
+            # Provider checks are in-memory and cheap: still report them truthfully.
+            db = [
+                asdict(CheckResult(n, False, elapsed, detail))
+                for n in ("database", "pgvector", "migrations")
+            ]
+            providers = [
+                asdict(_timed("llm", self._llm)),
+                asdict(_timed("embedding", self._embedding)),
+            ]
+            return {"status": "not_ready", "checks": db + providers, "timed_out": True}

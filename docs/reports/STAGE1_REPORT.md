@@ -223,3 +223,29 @@ docker compose --env-file .env -f infra/docker-compose.yml exec frontend npm tes
 5. **LangGraph checkpoint 表**：由 `langgraph-checkpoint-postgres` 的 `setup()` 自行管理，需要在阶段 4 确认它和 Alembic 共存的方式。
 6. **工具版本差异**：宿主 uv 0.13.4 与镜像的 0.13.5 有小版本差异，可以统一升级。
 7. **演示账号密码**：现在是公开在 `.env.example` 里的默认值，正式演示前建议在 `.env` 中改掉。
+
+---
+
+## 8. Stage 1.2 收尾（2026-11-02，tag `stage-1.2`）
+
+### 8.1 /health/ready 总超时（已实际验证，WSL2）
+新增 `OPSPILOT_READY_TIMEOUT_S`（默认 3 秒，范围 0–30）。所有检查在受限线程池中执行，超过期限立即返回 503；LLM/Embedding 检查是内存操作，超时后仍如实报告。
+```
+$ docker compose ... stop postgres
+HTTP 503 total 3.009542s
+HTTP 503 total 3.001888s
+{"status":"not_ready","checks":[{"name":"database","ok":false,"latency_ms":3000.44,"detail":"timeout: readiness checks exceeded 3.0s"}, ...
+$ docker compose ... start postgres
+recovered HTTP 200 total 0.004076s
+```
+（修复前 ≈8 秒，Stage 1.1 之前 ≈24 秒。）单元测试 `test_readiness_overall_deadline` 用 2 秒的慢检查 + 0.3 秒期限验证 < 1 秒返回。
+
+### 8.2 真实浏览器登录 E2E（已实际验证）
+- 脚本：`frontend/e2e/login_e2e.py`（Playwright for Python 1.64.1）——打开前端、填写邮箱/密码、点击登录，断言登录面板显示的邮箱与角色标签来自真实 `/api/v1/auth/me` 响应，再用浏览器内 token 直连 API 交叉核对，刷新后登录状态仍在。
+- **WSL 内无头 Chromium 无法启动**：`chrome-headless-shell: error while loading shared libraries: libasound.so.2`，补库需要 sudo apt（未执行）。
+- 因此在 **Windows 上用无头 Microsoft Edge** 驱动、访问 WSL 中运行的 Compose 栈（`scripts/e2e_windows.ps1`，uv 隔离环境，不改系统）：
+```
+{"result": "PASS", "email": "admin@opspilot.local", "role": "admin", "ui_role_label": "管理员", "survives_reload": true, "elapsed_s": 3.01}
+{"result": "PASS", "email": "alice@opspilot.local", "role": "user", "ui_role_label": "普通用户", "survives_reload": true, "elapsed_s": 2.95}
+```
+截图：`docs/assets/e2e-login-admin.png`。开发沙箱中用系统 Chrome 也跑通（PASS）。
