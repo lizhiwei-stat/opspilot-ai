@@ -42,12 +42,16 @@ def test_heldout_unanswerable_now_refused(run_agent, hid, user, q, head) -> None
         assert st["final"]["refusal_reason"] == "head_term_absent_from_accessible_kb"
         assert any(head in m for m in st["assessment"]["missing"])
     assert st["final"]["citations"] == []
-    assert nodes(st) == ["guard_in", "classify", "plan", "retrieve", "assess", "refuse"]
+    if hid == "h029":  # value missing -> one widened search_knowledge, then refuse
+        assert [r["tool"] for r in recs(st)] == ["search_knowledge"]
+        assert nodes(st)[-2:] == ["assess", "refuse"]
+    else:
+        assert nodes(st) == ["guard_in", "classify", "plan", "retrieve", "assess", "refuse"]
 
 
 @pytest.mark.parametrize(
     "q",
-    ["数据库连接池最大连接数建议设置多少", "订单服务 HTTP 500 应该怎么排查"],
+    ["访问令牌有效期是多久", "订单服务 HTTP 500 应该怎么排查", "支付回调签名密钥多久轮换一次"],
 )
 def test_answerable_controls_still_answered(run_agent, q) -> None:
     st = run_agent(q)
@@ -83,6 +87,13 @@ def test_ticket_query_skips_rag_and_uses_get_ticket(run_agent) -> None:
     assert "retrieve" not in nodes(st)
     assert [r["tool"] for r in recs(st)] == ["get_ticket"]
     assert "open" in st["final"]["answer"]
+
+
+def test_version_dependent_value_asks_for_clarification(run_agent) -> None:
+    st = run_agent("连接池最大连接数现在是多少")
+    assert st["final"]["status"] == "clarify" and st["status"] == "completed"
+    assert "30" in st["final"]["answer"] and "50" in st["final"]["answer"]
+    assert st["final"]["refusal_reason"] == "contradictory_evidence"
 
 
 def test_chitchat_and_out_of_scope(run_agent) -> None:

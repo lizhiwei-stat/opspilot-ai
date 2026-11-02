@@ -144,7 +144,7 @@ class MockAgentLLM:
 
         for t in hint.get("need_tools", []):
             if t == "search_knowledge":
-                add("search_knowledge", {"query": hint.get("search_query") or question})
+                add("search_knowledge", {"query": question, "top_k": 10})
         for code in ent.get("error_codes", []):
             add("analyze_error_code", {"code": code})
         if hint.get("intent") == "troubleshoot" and (
@@ -181,8 +181,15 @@ class MockAgentLLM:
         q = set(rules._content_tokens(question))
         codes = set(rules.ERROR_CODE.findall(question)) | set(rules.TICKET_NO.findall(question))
 
+        wants_value = bool(re.search(r"多少|多久|几|多长", question))
+
         def score(s: str) -> int:
-            return len(q & set(rules._content_tokens(s))) + 5 * sum(c in s for c in codes)
+            return (
+                len(q & set(rules._content_tokens(s)))
+                + 5 * sum(c in s for c in codes)
+                + (3 if wants_value and re.search(r"\d", rules.ERROR_CODE.sub("", s)) else 0)
+                - (5 if s.lstrip().startswith(("#", "|---", "| 错误码")) else 0)
+            )
 
         lines, cites = [], []
         for i, e in enumerate(evidence, 1):

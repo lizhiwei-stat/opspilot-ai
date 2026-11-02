@@ -37,6 +37,16 @@ _VALUE = re.compile(
 )
 _ANY_NUM = re.compile(r"\d|[一二两三四五六七八九十百千]+\s*(秒|分钟|小时|天|周|个月|次|步|位)")
 
+_CHANGED_TO = re.compile(r"(?:调整为|改为|恢复为|变更为|提高到|降低到|调到)\s*(\d+(?:\.\d+)?)")
+_BARE_NUM = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)(?![\w.])")
+
+_CODE_LIKE = re.compile(r"\b(?:[A-Z]{2,6}-\d{3,5}|ERR_[A-Z_]+|v\d+(?:\.\d+)*)\b")
+
+
+def _strip_codes(s: str) -> str:
+    return _CODE_LIKE.sub(" ", s)
+
+
 Presence = Callable[[list[str]], bool]  # ACL-scoped "do these parts co-occur in one chunk"
 
 
@@ -160,7 +170,11 @@ def assess(
                 for i in head_info
                 if i["parts"] and _has_parts(s, i["parts"])
             ]
-            if not any(_ANY_NUM.search(s) for _, s in head_sents):
+            if not any(_ANY_NUM.search(_strip_codes(s)) for _, s in head_sents):
+                if "search_knowledge" in tools_available and "search_knowledge" not in tools_done:
+                    need.append("search_knowledge")  # widen the search once before refusing
+                    reasons.append("value_not_in_retrieved_evidence")
+                    return out("need_tools", False)
                 missing.append("证据提到了该对象，但没有给出具体数值")
                 reasons.append("value_slot_empty")
                 return out("refuse", False)
@@ -180,6 +194,20 @@ def assess(
             checks["values"] = {
                 u: {v: sorted(d) for v, d in vs.items()} for u, vs in by_unit.items()
             }
+            # unit-less values ("最大连接数由 50 调整为 30" ... "恢复为 50"): the values the
+            # documents say it was changed to; more than one => version-dependent / conflicting
+            if not contradictions:
+                final: dict[str, set[str]] = {}
+                for title, s in head_sents:
+                    for v in _CHANGED_TO.findall(s):
+                        final.setdefault(title, set()).add(v)
+                vals = {v for vs in final.values() for v in vs}
+                if len(vals) > 1:
+                    contradictions.append(
+                        "资料中该值随版本变化或不同来源不一致："
+                        + "；".join(f"{'/'.join(sorted(v))}←{t}" for t, v in sorted(final.items()))
+                    )
+                checks["final_values"] = {t: sorted(v) for t, v in final.items()}
         if contradictions:
             reasons.append("contradictory_evidence")
             return out("ask_clarification", False)
