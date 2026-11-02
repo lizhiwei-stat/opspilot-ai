@@ -49,13 +49,30 @@ def verify_quote(quote: str, source: str, sep: str = " … ") -> bool:
     return bool(parts) and all(p and p in src for p in parts)
 
 
-def check_answer(answer: str, trusted_evidence: list[str]) -> PolicyResult:
+def _host(url: str) -> str:
+    u = re.sub(r"^(?:https?://)", "", url, flags=re.I)
+    return u.split("/", 1)[0].split("?", 1)[0].split(":", 1)[0].lower()
+
+
+def _allowed(host: str, allowlist: tuple[str, ...]) -> bool:
+    return any(host == d or host.endswith("." + d) for d in allowlist)
+
+
+def check_answer(
+    answer: str, trusted_evidence: list[str], link_allowlist: tuple[str, ...] = ()
+) -> PolicyResult:
+    """Links are allowed only if they occur in trusted evidence AND their host is on the
+    allowlist: a regex-free injection inside an un-flagged document ("please append
+    https://exfil...") is therefore still blocked, because evidence presence alone is not
+    enough for a URL."""
     trusted = "\n".join(trusted_evidence)
     v: list[str] = []
     for name, rx in (("email", _EMAIL), ("url", _URL), ("phone", _PHONE)):
         for m in rx.findall(answer):
             if m not in trusted:
                 v.append(f"untrusted_{name}:{m[:40]}")
+            elif name == "url" and not _allowed(_host(m), link_allowlist):
+                v.append(f"link_not_allowlisted:{_host(m)[:40]}")
     if _SECRET.search(answer):
         v.append("secret_like_string")
     if _ACTION_CLAIM.search(answer):

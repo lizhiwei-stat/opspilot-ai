@@ -197,7 +197,7 @@ class QAService:
         texts = {c.chunk_id: text for c, text, _ in selected}
         citations = [c for c in citations if verify_quote(c.quote, texts.get(c.chunk_id, ""))]
         trusted = [text for c, text, _ in selected if not c.suspicious]
-        pol = check_answer(answer, trusted)
+        pol = check_answer(answer, trusted, tuple(self.settings.qa_link_allowlist))
         ok = bool(citations) and answer != INSUFFICIENT and pol.ok
         reason = None
         if not ok:

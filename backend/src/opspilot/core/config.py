@@ -87,6 +87,8 @@ class Settings(BaseSettings):
     # multi_doc gold chunks the reranker under-scores); "rrf" = fuse reranker rank with the
     # hybrid rank via RRF, so strong first-stage evidence survives a single-signal rerank.
     rerank_fusion: Literal["replace", "rrf"] = "rrf"
+    # hosts an answer may link to (only if the link is also in trusted evidence)
+    qa_link_allowlist: tuple[str, ...] = ("opspilot.local", "corp.local")
     rerank_fusion_weight: float = Field(default=0.5, ge=0.0, le=1.0)  # reranker share
     qa_min_evidence: float = Field(default=0.5, ge=0, le=1)
     qa_max_context_chunks: int = Field(default=4, ge=1, le=20)
