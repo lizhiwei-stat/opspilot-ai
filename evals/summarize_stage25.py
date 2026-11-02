@@ -21,7 +21,7 @@ def f(x: object) -> str:
 
 
 def main() -> None:
-    runs = [("mock (hash, 无语义)", "mock"), ("bge-small-zh-v1.5", "local"), ("bge-m3", "m3")]
+    runs = [("mock (hash, 无语义)", "mock"), ("bge-small-zh-v1.5", "local"), ("bge-m3", "m3"), ("百炼 text-embedding-v4（付费，1024 维）", "dashscope")]
     print("# Stage 2.5 评测汇总表（由 evals/summarize_stage25.py 从 evals/results/*.json 生成）\n")
     for split in ("dev", "heldout"):
         print(f"## 检索：{split}（{'55 条' if split == 'dev' else '37 条冻结 held-out'}）\n")
@@ -53,6 +53,7 @@ def main() -> None:
             ("当前：bge-m3 + rule", f"m3_{split}"),
             ("当前：bge-small + cross-encoder（rerank 0.02 + anchor）", f"local_{split}"),
             ("当前：mock + cross-encoder", f"mock_{split}"),
+            ("当前：text-embedding-v4（付费）+ cross-encoder", f"dashscope_{split}"),
         ]:
             d = latest(tag)
             q = d["qa"]

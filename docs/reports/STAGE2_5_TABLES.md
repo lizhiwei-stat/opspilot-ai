@@ -18,6 +18,11 @@
 | bge-m3 | keyword | 0.934 | 0.836 | 0.870 | 2.43 | 3.09 | 0.0 | 1.000 | 1.000 | 0.875 |
 | bge-m3 | hybrid | 0.957 | 0.929 | 0.931 | 61.07 | 68.19 | 0.0 | 1.000 | 0.952 | 0.938 |
 | bge-m3 | hybrid_rerank:rule | 0.965 | 0.909 | 0.920 | 63.85 | 71.5 | 0.0 | 1.000 | 1.000 | 0.906 |
+| 百炼 text-embedding-v4（付费，1024 维） | vector | 0.872 | 0.924 | 0.907 | 620.51 | 1713.0 | 0.0 | 1.000 | 0.691 | 0.938 |
+| 百炼 text-embedding-v4（付费，1024 维） | keyword | 0.934 | 0.836 | 0.870 | 2.42 | 3.41 | 0.0 | 1.000 | 1.000 | 0.875 |
+| 百炼 text-embedding-v4（付费，1024 维） | hybrid | 0.954 | 0.942 | 0.925 | 608.33 | 1321.54 | 0.0 | 1.000 | 1.000 | 0.969 |
+| 百炼 text-embedding-v4（付费，1024 维） | hybrid_rerank:rule | 0.977 | 0.913 | 0.918 | 623.01 | 1960.54 | 0.0 | 1.000 | 1.000 | 0.969 |
+| 百炼 text-embedding-v4（付费，1024 维） | hybrid_rerank:cross_encoder | 0.977 | 0.965 | 0.954 | 2556.66 | 3230.69 | 0.0 | 1.000 | 1.000 | 0.969 |
 
 ## 问答拒答：dev
 
@@ -30,6 +35,7 @@
 | 当前：bge-m3 + rule | lexical 0.25 | 1.000 | 1.000 | 1.000 | - | - | 20261102T052623Z_m3_dev.json |
 | 当前：bge-small + cross-encoder（rerank 0.02 + anchor） | reranker 0.02 | 1.000 | 1.000 | 1.000 | - | - | 20261102T050822Z_local_dev.json |
 | 当前：mock + cross-encoder | reranker 0.02 | 1.000 | 1.000 | 1.000 | - | - | 20261102T051333Z_mock_dev.json |
+| 当前：text-embedding-v4（付费）+ cross-encoder | reranker 0.02 | 1.000 | 1.000 | 1.000 | - | - | 20261102T055038Z_dashscope_dev.json |
 
 ## 检索：heldout（37 条冻结 held-out）
 
@@ -49,6 +55,11 @@
 | bge-m3 | keyword | 0.963 | 0.867 | 0.892 | 2.62 | 3.38 | 0.0 | 1.000 | 0.800 | 1.000 |
 | bge-m3 | hybrid | 0.926 | 0.926 | 0.927 | 61.39 | 72.01 | 0.0 | 1.000 | 0.800 | 0.938 |
 | bge-m3 | hybrid_rerank:rule | 0.963 | 0.963 | 0.957 | 63.6 | 74.68 | 0.0 | 1.000 | 1.000 | 0.938 |
+| 百炼 text-embedding-v4（付费，1024 维） | vector | 0.907 | 0.842 | 0.860 | 783.46 | 1845.72 | 0.0 | 1.000 | 0.700 | 0.938 |
+| 百炼 text-embedding-v4（付费，1024 维） | keyword | 0.963 | 0.867 | 0.892 | 2.56 | 3.5 | 0.0 | 1.000 | 0.800 | 1.000 |
+| 百炼 text-embedding-v4（付费，1024 维） | hybrid | 0.944 | 0.883 | 0.906 | 760.71 | 1190.19 | 0.0 | 1.000 | 0.900 | 0.938 |
+| 百炼 text-embedding-v4（付费，1024 维） | hybrid_rerank:rule | 0.963 | 0.935 | 0.939 | 774.59 | 1696.29 | 0.0 | 1.000 | 1.000 | 0.938 |
+| 百炼 text-embedding-v4（付费，1024 维） | hybrid_rerank:cross_encoder | 1.000 | 0.957 | 0.966 | 2523.49 | 3722.05 | 0.0 | 1.000 | 1.000 | 1.000 |
 
 ## 问答拒答：heldout
 
@@ -61,6 +72,7 @@
 | 当前：bge-m3 + rule | lexical 0.25 | 0.600 | 0.926 | 0.838 | h029,h033,h036,h037 | h005,h006 | 20261102T052654Z_m3_heldout.json |
 | 当前：bge-small + cross-encoder（rerank 0.02 + anchor） | reranker 0.02 | 0.500 | 1.000 | 0.865 | h029,h032,h033,h035,h036 | - | 20261102T051120Z_local_heldout.json |
 | 当前：mock + cross-encoder | reranker 0.02 | 0.500 | 1.000 | 0.865 | h029,h032,h033,h035,h036 | - | 20261102T051630Z_mock_heldout.json |
+| 当前：text-embedding-v4（付费）+ cross-encoder | reranker 0.02 | 0.500 | 1.000 | 0.865 | h029,h032,h033,h035,h036 | - | 20261102T055741Z_dashscope_heldout.json |
 
 ## Reranker 融合方式（修复 c）前后
 

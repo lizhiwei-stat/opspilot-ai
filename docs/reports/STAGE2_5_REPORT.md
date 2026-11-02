@@ -51,12 +51,11 @@ ACL 隔离 1.000（0 泄漏）、失败率 0：所有配置。
 - Notebook 在 WSL 上离线执行，输出保留
 
 ### 仅静态检查 / 单元测试（未在真实服务上运行）
-- 付费路径（DashScope embedding、Qwen chat）：只用**假付费 provider** 测试守卫、预算、账本、脱敏（`tests/unit/test_gateway.py` 11 项）；**从未发起真实请求**
+- Qwen chat 付费路径：只用假 provider 测试守卫（`tests/unit/test_gateway.py` 11 项），**从未发起真实请求**
 - 付费实验方案中的价格：来自阿里云官方文档页（2026-11-02），未经实际账单核对
 - Stage 3 设计中的 LangGraph API：依据官方文档与 PyPI，未写代码、未运行
 
 ### 尚未验证
-- 百炼 text-embedding-v4 的实际检索效果（待批准）
 - bge-m3 + cross-encoder 组合（CPU 时间成本，未跑）
 - 大语料（>1 万 chunk）下的延迟与召回；当前语料仅 42 个 chunk
 - 真实 LLM 生成答案的质量（仍为 mock 抽取式回答器）
@@ -85,3 +84,6 @@ docker compose --env-file .env -f infra/docker-compose.yml exec frontend npm tes
 powershell -File scripts\e2e_windows.ps1 -Shots <截图目录>     # Windows 侧
 uv run --group local-embed --group notebook jupyter nbconvert --to notebook --execute --inplace notebooks/real_embedding_hybrid.ipynb
 ```
+
+## 7. 付费对照实验（stage-2.5.1）
+经 Teddy 批准（approval id `teddy-2026-11-02-t63s266`，2026-11-02 13:49 HKT），在 WSL 上运行百炼 text-embedding-v4（1024 维，独立索引）dev + held-out 评测：473 次调用、**9,272 输入 tokens（API usage）、实际费用 ¥0.004636**，每次运行上限 ¥1 未触发；Key 未落盘，泄漏检查 0 命中。结果：向量 MRR 高（dev .924）但 Recall@5 偏低（.872，multi_doc .691），混合 + 重排后与本地模型持平，延迟高 50 倍以上——默认仍用本地 bge-small。详见 [STAGE2_5_EVAL §13](STAGE2_5_EVAL.md#13-付费对照实验百炼-text-embedding-v4stage-251已获批准并执行)。

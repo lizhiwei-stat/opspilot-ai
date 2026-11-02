@@ -117,3 +117,31 @@ OPSPILOT_LOCAL_EMBEDDING_MODEL=BAAI/bge-m3 OPSPILOT_LOCAL_EMBEDDING_REVISION=561
 uv run python scripts/exp_iterative_scan.py --n 100000 --selectivity 0.01
 uv run python evals/summarize_stage25.py   # 重新生成 STAGE2_5_TABLES.md
 ```
+
+## 13. 付费对照实验：百炼 text-embedding-v4（stage-2.5.1，已获批准并执行）
+
+- 批准：Teddy，2026-11-02 13:49 HKT，approval id **`teddy-2026-11-02-t63s266`**（写入账本每一行）；按 [付费方案](../STAGE2_5_PAID_EMBED_PLAN.md) 执行，每次运行硬上限 ¥1（总额度 ¥10）。
+- 配置：`text-embedding-v4`，1024 维，batch 10，OpenAI 兼容接口（北京地域）；独立索引（`embedding_models` 新行 + 独立部分 HNSW），未改动 mock / bge 向量。Key 仅在运行进程环境中注入，未写入任何文件；运行后对结果、账本、docs 做了按值比对的泄漏检查：0 个文件包含 Key。
+- 运行时间：dev 13:44–13:50 HKT（411 s，含 cross-encoder），held-out 13:53–13:57 HKT（278 s）。
+- **实际用量（来自 API 返回的 usage，账本 `evals/results/paid_ledger_teddy-2026-11-02-t63s266.jsonl`）**：473 次调用全部成功；输入 **9,272 tokens**（建索引 5 批 42 个 chunk 4,818 tokens + 468 次查询嵌入 4,454 tokens）；**实际费用 ¥0.004636**（dev ¥0.003678 + held-out ¥0.000958），远低于每次 ¥1 上限与预估上界 ¥0.0074。未触发任何预算拒绝。
+- 调用次数比方案多（评测对每个模式、QA 各自重新嵌入查询，未做缓存），但 token 总量仍在预估内。
+
+| 数据 | 模式 | text-embedding-v4 R@5 / MRR | bge-small | bge-m3 | mock |
+|---|---|---|---|---|---|
+| dev | vector | .872 / **.924** | .891 / .810 | .950 / .922 | .888 / .855 |
+| dev | hybrid | .954 / **.942** | .954 / .893 | .957 / .929 | .946 / .859 |
+| dev | hybrid+rule | .977 / .913 | .988 / .909 | .965 / .909 | .957 / .878 |
+| dev | hybrid+CE | .977 / .965 | 1.000 / .965 | — | .969 / .942 |
+| held-out | vector | .907 / .842 | .889 / .796 | .926 / .883 | .944 / .836 |
+| held-out | hybrid | .944 / .883 | .926 / .869 | .926 / .926 | .944 / .866 |
+| held-out | hybrid+rule | .963 / .935 | .963 / .901 | .963 / .963 | 1.000 / .914 |
+| held-out | hybrid+CE | 1.000 / .957 | 1.000 / .938 | — | 1.000 / .938 |
+
+keyword 在所有行相同（dev .934/.836，held-out .963/.867）；ACL 隔离 1.000、失败率 0。
+
+**发现**
+1. text-embedding-v4 向量检索**排序质量好（dev MRR .924，与 bge-m3 相当），但 Recall@5 不高**：multi_doc 只有 .691（dev）/.700（held-out），error_code 类 .817（dev）——第二个相关文档和精确错误码容易掉出前 5。
+2. 混合检索后差距基本消失：hybrid dev MRR .942 为所有 hybrid 中最高；加 reranker 后与本地模型持平，没有显著优势。
+3. 延迟：查询向量化走网络，vector P50 约 620–780 ms、P95 1.7–1.8 s，是本地 bge-small（12 ms）的 50 倍以上；且有外部依赖与费用。
+4. 问答拒答与本地模型完全相同（held-out 0.500/1.000，误答 h029/h032/h033/h035/h036）——拒答问题与 embedding 无关，再次说明需要可回答性判断。
+5. 结论：在本语料上**付费 embedding 不值得替换默认的本地 bge-small + hybrid + rule**；若追求单路向量质量，免费的 bge-m3 已达到同等 MRR。注意语料仅 42 chunk，结论只适用于本数据集。

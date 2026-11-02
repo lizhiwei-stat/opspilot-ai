@@ -1,6 +1,8 @@
 # Stage 2.5 付费 Embedding 对照实验方案（待批准，**尚未执行**）
 
-> 状态：**仅方案**。本仓库截至 stage-2.5 没有发起过任何付费 API 调用；`OPSPILOT_ALLOW_PAID_API` 默认 `false`，盒子/WSL 上的 Key 未被读取、打印或写入文件。执行前需要 Teddy 单独书面批准，并给出 approval id。
+> 状态更新（2026-11-02 13:57 HKT）：**已获批准并执行**（approval id `teddy-2026-11-02-t63s266`），实际 9,272 tokens / ¥0.004636，结果见 [STAGE2_5_EVAL §13](reports/STAGE2_5_EVAL.md)。以下为原方案。
+>
+> 原状态：**仅方案**。本仓库截至 stage-2.5 没有发起过任何付费 API 调用；`OPSPILOT_ALLOW_PAID_API` 默认 `false`，盒子/WSL 上的 Key 未被读取、打印或写入文件。执行前需要 Teddy 单独书面批准，并给出 approval id。
 
 ## 1. 目的
 
