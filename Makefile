@@ -1,0 +1,44 @@
+# Common tasks. All Python commands run through uv; mock LLM mode by default.
+.PHONY: install migrate seed dev-backend dev-frontend test test-unit lint fmt fe-build fe-test up down check
+
+install:
+	uv sync
+	cd frontend && npm ci
+
+migrate:
+	uv run alembic upgrade head
+
+seed:
+	uv run python scripts/seed_demo.py
+
+dev-backend:
+	uv run uvicorn opspilot.main:create_app --factory --reload --port 8000
+
+dev-frontend:
+	cd frontend && npm run dev
+
+test:
+	OPSPILOT_REQUIRE_DB=1 uv run pytest -v
+
+test-unit:
+	uv run pytest tests/unit -v
+
+lint:
+	uv run ruff check . && uv run ruff format --check .
+
+fmt:
+	uv run ruff check --fix . && uv run ruff format .
+
+fe-build:
+	cd frontend && npm run build
+
+fe-test:
+	cd frontend && npm test
+
+up:
+	docker compose -f infra/docker-compose.yml up -d --build
+
+down:
+	docker compose -f infra/docker-compose.yml down
+
+check: lint test fe-build fe-test

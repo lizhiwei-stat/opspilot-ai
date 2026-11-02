@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+/* Tailwind v4 defaults borders to currentColor; use a neutral enterprise grey instead. */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-slate-200);
+  }
+}
