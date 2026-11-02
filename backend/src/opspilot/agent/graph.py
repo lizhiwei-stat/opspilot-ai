@@ -897,6 +897,10 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
         ans = f["answer"]
         problems: list[str] = []
         idx = {int(x) for x in _INDEX.findall(ans)}
+        # real models sometimes return the JSON citations list without inline [n] markers;
+        # fall back to the declared list (numbers are still checked against cited text)
+        if not idx and not llm.is_mock:
+            idx = {int(c["index"]) for c in f["citations"]}
         if not f["citations"] or not idx:
             problems.append("no_citation")
         if any(i < 1 or i > len(evs) for i in idx):

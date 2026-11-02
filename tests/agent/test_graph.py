@@ -348,3 +348,16 @@ def test_real_mode_answer_with_exfil_link_fails_policy(run_agent) -> None:
     st = run_agent("访问令牌有效期是多久", llm=llm)
     assert st["status"] == "refused"
     assert any(v.startswith("untrusted_url") for v in st["final"]["policy_violations"])
+
+
+def test_real_mode_citations_list_without_inline_markers_is_accepted(run_agent) -> None:
+    # Qwen smoke (t66u) regression: JSON citations=[1] but no "[1]" in the answer text
+    llm = FakeRealLLM(answer="访问令牌有效期为 60 分钟。")
+    st = run_agent("访问令牌有效期是多久", llm=llm)
+    assert st["status"] == "completed", st["final"].get("policy_violations")
+
+
+def test_real_mode_citations_list_still_checks_numbers(run_agent) -> None:
+    llm = FakeRealLLM(answer="访问令牌有效期为 999 分钟。")
+    st = run_agent("访问令牌有效期是多久", llm=llm)
+    assert "unsupported_number:999" in st["final"]["policy_violations"]
