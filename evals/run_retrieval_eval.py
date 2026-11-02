@@ -191,6 +191,7 @@ def main() -> int:
         default="current",
         help="stage2 = Stage 2 QA config (lexical evidence 0.5, no anchor check)",
     )
+    ap.add_argument("--rerank-fusion", choices=["replace", "rrf"], default=None)
     ap.add_argument("--tag", default=None, help="output name suffix")
     ap.add_argument("--no-db", action="store_true", help="do not write eval_runs rows")
     ap.add_argument("--no-qa", action="store_true")
@@ -215,6 +216,8 @@ def main() -> int:
             "qa_min_evidence": 0.5,
             "qa_require_anchor_terms": False,
         }
+    if args.rerank_fusion:
+        overrides["rerank_fusion"] = args.rerank_fusion
     settings = Settings(**{**settings.model_dump(), **overrides})
     rerankers = [r for r in args.rerankers.split(",") if r]
     modes = parse_modes(args.modes, rerankers)
@@ -373,6 +376,8 @@ def main() -> int:
             "chunk_size": settings.chunk_size,
             "chunk_overlap": settings.chunk_overlap,
             "rrf_k": settings.rrf_k,
+            "rerank_fusion": settings.rerank_fusion,
+            "rerank_fusion_weight": settings.rerank_fusion_weight,
             "retrieval_candidates": settings.retrieval_candidates,
             "rerank_candidates": settings.rerank_candidates,
             "qa_evidence": settings.qa_evidence,

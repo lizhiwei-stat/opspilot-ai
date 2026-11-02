@@ -83,6 +83,11 @@ class Settings(BaseSettings):
     rrf_k: int = Field(default=60, ge=1)
     retrieval_candidates: int = Field(default=50, ge=5, le=500)
     rerank_candidates: int = Field(default=20, ge=2, le=200)
+    # Stage 2.5 fix (c): "replace" = order purely by reranker score (Stage 2 behaviour; lost
+    # multi_doc gold chunks the reranker under-scores); "rrf" = fuse reranker rank with the
+    # hybrid rank via RRF, so strong first-stage evidence survives a single-signal rerank.
+    rerank_fusion: Literal["replace", "rrf"] = "rrf"
+    rerank_fusion_weight: float = Field(default=0.5, ge=0.0, le=1.0)  # reranker share
     qa_min_evidence: float = Field(default=0.5, ge=0, le=1)
     qa_max_context_chunks: int = Field(default=4, ge=1, le=20)
     # Evidence signal: lexical = query-term coverage (Stage 2) | reranker = cross-encoder

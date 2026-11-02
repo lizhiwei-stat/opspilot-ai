@@ -169,6 +169,15 @@ class RetrievalService:
             scores = self.reranker.score(query, [rows[c][0].content for c in pool])
             order = sorted(range(len(pool)), key=lambda i: (-scores[i], i))
             rr = {pool[i]: (r + 1, scores[i]) for r, i in enumerate(order)}
+            if self.settings.rerank_fusion == "rrf":
+                # rank-level fusion of reranker order and first-stage (hybrid) order;
+                # pool is in hybrid order, so hybrid rank of pool[i] is i + 1
+                k, w = self.settings.rrf_k, self.settings.rerank_fusion_weight
+                blend = {
+                    pool[i]: w / (k + rr[pool[i]][0]) + (1 - w) / (k + i + 1)
+                    for i in range(len(pool))
+                }
+                order = sorted(range(len(pool)), key=lambda i: (-blend[pool[i]], i))
             pool = [pool[i] for i in order]
             t["rerank_ms"] = (time.perf_counter() - s) * 1000
 
