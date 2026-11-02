@@ -11,7 +11,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="OPSPILOT_", env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_prefix="OPSPILOT_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        # Validation errors must never echo config values (DB URLs with passwords, API keys).
+        hide_input_in_errors=True,
     )
 
     env: Literal["dev", "test", "prod"] = "dev"

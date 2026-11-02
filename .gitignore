@@ -12,3 +12,4 @@ frontend/dist/
 *.tsbuildinfo
 data/uploads/
 evals/results/*.tmp
+evals/results/latest_*.json
