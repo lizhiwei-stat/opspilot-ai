@@ -68,13 +68,16 @@ class HealthService:
         return f"{self.embedding.name}/{self.embedding.model} dim={self.embedding.dim}"
 
     def readiness(self) -> dict[str, object]:
-        checks = [
-            _timed("database", self._database),
-            _timed("pgvector", self._pgvector),
-            _timed("migrations", self._migrations),
-            _timed("llm", self._llm),
-            _timed("embedding", self._embedding),
-        ]
+        db = _timed("database", self._database)
+        if db.ok:
+            db_checks = [_timed("pgvector", self._pgvector), _timed("migrations", self._migrations)]
+        else:
+            # Don't wait for the same connection timeout two more times.
+            db_checks = [
+                CheckResult(name, False, 0.0, "skipped: database unavailable")
+                for name in ("pgvector", "migrations")
+            ]
+        checks = [db, *db_checks, _timed("llm", self._llm), _timed("embedding", self._embedding)]
         return {
             "status": "ready" if all(c.ok for c in checks) else "not_ready",
             "checks": [asdict(c) for c in checks],

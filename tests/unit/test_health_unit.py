@@ -13,4 +13,5 @@ def test_readiness_reports_db_down_without_raising() -> None:
     by = {c["name"]: c for c in report["checks"]}  # type: ignore[index]
     assert report["status"] == "not_ready"
     assert not by["database"]["ok"] and not by["pgvector"]["ok"]
+    assert by["pgvector"]["detail"] == "skipped: database unavailable"
     assert by["llm"]["ok"] and by["embedding"]["ok"]

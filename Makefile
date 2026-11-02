@@ -1,5 +1,7 @@
 # Common tasks. All Python commands run through uv; mock LLM mode by default.
-.PHONY: install migrate seed dev-backend dev-frontend test test-unit lint fmt fe-build fe-test up down check
+COMPOSE = docker compose --env-file .env -f infra/docker-compose.yml
+
+.PHONY: install migrate seed dev-backend dev-frontend test test-unit lint fmt fe-build fe-test up down seed-docker ps check
 
 install:
 	uv sync
@@ -36,9 +38,15 @@ fe-test:
 	cd frontend && npm test
 
 up:
-	docker compose -f infra/docker-compose.yml up -d --build
+	docker compose --env-file .env -f infra/docker-compose.yml up -d --build
 
 down:
-	docker compose -f infra/docker-compose.yml down
+	docker compose --env-file .env -f infra/docker-compose.yml down
 
 check: lint test fe-build fe-test
+
+seed-docker:
+	$(COMPOSE) exec backend python scripts/seed_demo.py
+
+ps:
+	$(COMPOSE) ps
