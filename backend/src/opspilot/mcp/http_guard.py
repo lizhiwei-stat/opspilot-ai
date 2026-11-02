@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import hmac
+import json
 import os
 
 import uvicorn
@@ -57,11 +58,11 @@ def build_app(srv: MCPServer, port: int) -> ASGIApp:
     token = os.environ.get("OPSPILOT_MCP_HTTP_TOKEN", "")
     if len(token) < 32:
         raise SystemExit("OPSPILOT_MCP_HTTP_TOKEN (>=32 chars) is required for the HTTP transport")
-    origins = {
-        o.strip()
-        for o in os.environ.get("OPSPILOT_MCP_HTTP_ALLOWED_ORIGINS", "").split(",")
-        if o.strip()
-    }
+    raw = os.environ.get("OPSPILOT_MCP_HTTP_ALLOWED_ORIGINS", "").strip()
+    items = (
+        json.loads(raw) if raw.startswith("[") else raw.split(",")
+    )  # JSON list (Settings) or CSV
+    origins = {str(o).strip() for o in items if str(o).strip()}
     sec = TransportSecuritySettings(
         enable_dns_rebinding_protection=True,
         allowed_hosts=[f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"],

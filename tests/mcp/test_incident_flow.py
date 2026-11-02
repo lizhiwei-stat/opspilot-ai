@@ -33,7 +33,9 @@ def _close_hubs():
 def _tickets(sf, draft_id: str) -> int:
     with sf() as s:
         return int(
-            s.scalar(select(func.count()).select_from(Ticket).where(Ticket.source_draft_id == draft_id))
+            s.scalar(
+                select(func.count()).select_from(Ticket).where(Ticket.source_draft_id == draft_id)
+            )
             or 0
         )
 

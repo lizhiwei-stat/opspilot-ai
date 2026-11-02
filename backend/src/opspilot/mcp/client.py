@@ -39,10 +39,10 @@ from pathlib import Path
 from typing import Any
 
 import structlog
-from mcp import Client, StdioServerParameters
 from mcp.types import TextContent
 from pydantic import BaseModel, SecretStr, ValidationError
 
+from mcp import Client, StdioServerParameters
 from opspilot.agent.tools import (
     ToolError,
     ToolNotFound,
@@ -240,10 +240,11 @@ class MCPHub:
                     self._tasks.add(task)
                     task.add_done_callback(self._tasks.discard)
         except BaseException as exc:
+            leaf = _leaf(exc)
             if conn.ready and not conn.ready.done():
                 conn.ready.set_exception(
                     ServerUnavailable(
-                        f"{launch.name}: {type(exc).__name__}: {redact(str(exc))[:200]}"
+                        f"{launch.name}: {type(leaf).__name__}: {redact(str(leaf))[:200]}"
                     )
                 )
             log.warning("mcp_server_down", server=launch.name, error=type(exc).__name__)
@@ -397,6 +398,14 @@ class MCPHub:
             raise
         except Exception as exc:  # SDK/transport error (MCPError, timeout from read_timeout)
             name = type(exc).__name__
+            if "connection closed" in str(exc).lower():
+                # the server process died: drop the connection so the next call relaunches it
+                conn.alive = False
+                self._loop.call_soon_threadsafe(q.put_nowait, None)
+                self._client_audit(
+                    server, tool, caller, "unavailable", t0, "connection closed", clean
+                )
+                raise ServerUnavailable(f"{server} connection closed") from exc
             if "timeout" in name.lower() or "timed out" in str(exc).lower():
                 self._client_audit(server, tool, caller, "timeout", t0, name, clean)
                 raise TimeoutError(f"MCP {server}.{tool} timed out after {timeout}s") from exc
@@ -461,6 +470,13 @@ class MCPHub:
                 s.commit()
         except Exception:
             log.warning("mcp_client_audit_failed", server=server, tool=tool)
+
+
+def _leaf(exc: BaseException) -> BaseException:
+    """First non-group exception (anyio TaskGroups wrap the real cause)."""
+    while isinstance(exc, BaseExceptionGroup) and exc.exceptions:
+        exc = exc.exceptions[0]
+    return exc
 
 
 _HUBS: dict[str, MCPHub] = {}

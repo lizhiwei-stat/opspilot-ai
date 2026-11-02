@@ -18,8 +18,8 @@ from opspilot.db.models import User
 from opspilot.llm.mock import MockEmbedding
 from opspilot.mcp.client import CallerCtx, MCPHub
 from tests.agent.conftest import agent_db, session_factory  # noqa: F401
-from tests.integration.conftest import migrated_db  # noqa: F401
 from tests.conftest import make_settings
+from tests.integration.conftest import migrated_db  # noqa: F401
 
 
 @pytest.fixture(scope="module")
