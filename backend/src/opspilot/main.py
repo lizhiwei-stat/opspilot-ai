@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import sessionmaker
 
 from opspilot import __version__
-from opspilot.api.routes import agent, auth, evals, health, knowledge, search, system
+from opspilot.api.routes import agent, auth, evals, health, knowledge, mcp, search, system
 from opspilot.core.config import Settings, get_settings
 from opspilot.core.errors import register_error_handlers
 from opspilot.core.logging import configure_logging, get_logger
@@ -39,6 +39,9 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     pool = getattr(app.state, "agent_pool", None)  # LangGraph checkpointer pool (lazy)
     if pool is not None:
         pool.close()
+    from opspilot.mcp.client import close_all
+
+    close_all()  # stop the MCP server subprocesses
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -79,6 +82,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         search.router,
         evals.router,
         agent.router,
+        mcp.router,
     ):
         app.include_router(r)
     get_logger().info(
