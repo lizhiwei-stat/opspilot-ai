@@ -33,7 +33,7 @@ def login(browser: Browser, url: str, email: str, pw: str) -> Page:
     page.get_by_label("密码").fill(pw)
     page.get_by_role("button", name="登录", exact=True).click()
     expect(page.get_by_label("auth")).to_contain_text("已登录", timeout=10_000)
-    expect(page.locator("header")).to_contain_text("Stage 3")
+    expect(page.locator("header")).to_contain_text("Stage 4")
     page.get_by_role("link", name="Agent").click()
     return page
 
@@ -115,9 +115,12 @@ def main() -> int:
         expect(adm.get_by_label("approval")).to_be_visible(timeout=30_000)
         shot(adm, a.screenshots, "stage3_agent_approval_pending.png")
         adm.get_by_role("button", name="批准").click()
-        expect(adm.get_by_label("draft-status")).to_contain_text("approved", timeout=30_000)
+        # Stage 4: approval runs the business op (Ticket MCP update_ticket_status)
+        expect(adm.get_by_label("draft-status")).to_contain_text("executed", timeout=30_000)
         expect(adm.get_by_label("node-trace")).to_contain_text("apply_approval")
-        checks["admin_approve_resume"] = "interrupt -> approve -> apply_approval -> draft approved"
+        checks["admin_approve_resume"] = (
+            "interrupt -> approve -> apply_approval -> draft executed (ticket created)"
+        )
         shot(adm, a.screenshots, "stage3_agent_approved.png")
         browser.close()
     print(

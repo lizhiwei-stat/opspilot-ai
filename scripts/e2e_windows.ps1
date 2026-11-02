@@ -32,3 +32,12 @@ $env:OPSPILOT_E2E_USER_PASSWORD = Get-Val "OPSPILOT_SEED_USER_PASSWORD"
 $env:OPSPILOT_E2E_ADMIN_PASSWORD = Get-Val "OPSPILOT_SEED_ADMIN_PASSWORD"
 & $uv run -q --no-project --python 3.11 --with playwright==1.64.1 python $ag --url $Url --channel msedge @extra
 Remove-Item Env:OPSPILOT_E2E_USER_PASSWORD, Env:OPSPILOT_E2E_ADMIN_PASSWORD
+# Stage 4: MCP incident -> approval (return-for-revision, approve) -> ticket, audit.
+$m4 = "$env:TEMP\mcp_e2e.py"
+Copy-Item -Force "$share\frontend\e2e\mcp_e2e.py" $m4
+$env:OPSPILOT_E2E_USER_PASSWORD = Get-Val "OPSPILOT_SEED_USER_PASSWORD"
+$env:OPSPILOT_E2E_ADMIN_PASSWORD = Get-Val "OPSPILOT_SEED_ADMIN_PASSWORD"
+Push-Location $env:TEMP  # mcp_e2e imports helpers from agent_e2e.py (copied above)
+& $uv run -q --no-project --python 3.11 --with playwright==1.64.1 python $m4 --url $Url --channel msedge @extra
+Pop-Location
+Remove-Item Env:OPSPILOT_E2E_USER_PASSWORD, Env:OPSPILOT_E2E_ADMIN_PASSWORD
