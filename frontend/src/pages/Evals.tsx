@@ -16,8 +16,49 @@ export default function Evals({ token }: { token: string }) {
   const warning = runs.find((r) => r.config.warning)?.config.warning;
   const qa = runs.find((r) => r.metrics.qa)?.metrics.qa;
 
+  // side-by-side matrix: mode x (embedding model, split); latest run per cell
+  const colKey = (r: EvalRun) => `${String(r.config.embedding_model ?? "?")} · ${String(r.config.dataset_split ?? "dev")}`;
+  const latest = new Map<string, EvalRun>();
+  for (const r of runs) {
+    const k = `${r.retriever}|${colKey(r)}`;
+    const prev = latest.get(k);
+    if (!prev || prev.started_at < r.started_at) latest.set(k, r);
+  }
+  const cols = [...new Set(runs.map(colKey))].sort();
+  const modes = [...new Set(runs.map((r) => r.retriever))].sort();
+
   return (
     <div className="space-y-6">
+      {runs.length > 0 && (
+        <Card title="Mock vs 真实 Embedding 并排对比（Recall@5 / MRR@10，每格取最新一次）" label="eval-matrix">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="text-left text-slate-500">
+                <tr>
+                  <th className="py-1">模式</th>
+                  {cols.map((c) => (
+                    <th key={c}>
+                      {c}
+                      {c.startsWith("mock") && <Badge tone="amber">无语义</Badge>}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {modes.map((m) => (
+                  <tr key={m} className="border-t">
+                    <td className="py-1 font-mono">{m}</td>
+                    {cols.map((c) => {
+                      const r = latest.get(`${m}|${c}`);
+                      return <td key={c}>{r ? `${fmt(r.metrics.recall_at_5)} / ${fmt(r.metrics.mrr_at_10)}` : "–"}</td>;
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
       <Card title="检索评测结果" label="evals">
         <ErrorText error={error} />
         {warning && (
@@ -87,6 +128,7 @@ export default function Evals({ token }: { token: string }) {
                 <th>Recall@5</th>
                 <th>MRR@10</th>
                 <th>延迟 ms</th>
+                <th>失败类别</th>
                 <th>Top-3</th>
               </tr>
             </thead>
@@ -98,6 +140,7 @@ export default function Evals({ token }: { token: string }) {
                   <td>{fmt(c.recall_at_5, 2)}</td>
                   <td>{fmt(c.details.mrr_at_10, 2)}</td>
                   <td>{c.latency_ms}</td>
+                  <td>{c.details.failure_category ? <Badge tone={c.details.failure_category === "hit" ? "green" : "amber"}>{String(c.details.failure_category)}</Badge> : "–"}</td>
                   <td className="text-slate-500">{c.details.top?.slice(0, 3).map((t) => `${t.doc}${t.page ? `#p${t.page}` : ""}`).join("，") || "（无结果）"}</td>
                 </tr>
               ))}

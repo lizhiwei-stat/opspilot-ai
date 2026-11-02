@@ -145,15 +145,28 @@ describe("Evals page", () => {
     mockFetch((url) => {
       if (url.endsWith("/api/v1/evals/runs")) return { body: [RUN] };
       if (url.endsWith("/api/v1/evals/runs/r1"))
-        return { body: { ...RUN, cases: [{ case_id: "q001", label_source: "synthetic", recall_at_5: 1, latency_ms: 3, details: { category: "exact_keyword", mrr_at_10: 1, top: [{ rank: 1, doc: "guide.pdf", page: 2 }] } }] } };
+        return { body: { ...RUN, cases: [{ case_id: "q001", label_source: "synthetic", recall_at_5: 1, latency_ms: 3, details: { category: "exact_keyword", failure_category: "hit", mrr_at_10: 1, top: [{ rank: 1, doc: "guide.pdf", page: 2 }] } }] } };
       return undefined;
     });
     render(<Evals token="t" />);
     await screen.findByText("0.900");
     expect(screen.getByText("mock embedding 没有语义")).toBeTruthy();
-    expect(screen.getByText("无语义")).toBeTruthy();
-    fireEvent.click(screen.getByText("hybrid"));
+    expect(screen.getAllByText("无语义").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByText("hybrid").at(-1)!);
     await screen.findByText("q001");
     expect(screen.getByText("guide.pdf#p2")).toBeTruthy();
+    expect(screen.getByText("hit")).toBeTruthy();
+  });
+
+  it("shows mock and real embedding runs side by side per split", async () => {
+    const real: EvalRun = { ...RUN, id: "r2", started_at: "2026-11-02T01:00:00Z",
+      config: { embedding_model: "bge-small-zh-v1.5", embedding_has_semantics: true, dataset_split: "heldout" },
+      metrics: { ...RUN.metrics, recall_at_5: 0.889, mrr_at_10: 0.796 } };
+    mockFetch((url) => (url.endsWith("/api/v1/evals/runs") ? { body: [RUN, real] } : undefined));
+    render(<Evals token="t" />);
+    await screen.findByText("bge-small-zh-v1.5 · heldout");
+    expect(screen.getByText("mock-hash-embedding-v1 · dev")).toBeTruthy();
+    expect(screen.getByText("0.889 / 0.796")).toBeTruthy();
+    expect(screen.getByText("0.900 / 0.800")).toBeTruthy();
   });
 });

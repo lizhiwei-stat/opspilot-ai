@@ -222,7 +222,7 @@ export interface EvalCase {
   label_source: string;
   recall_at_5: number | null;
   latency_ms: number | null;
-  details: { category?: string; mrr_at_10?: number | null; acl_leaks?: number; top?: { rank: number; doc: string; page: number | null }[]; error?: string | null };
+  details: { category?: string; failure_category?: string; mrr_at_10?: number | null; acl_leaks?: number; top?: { rank: number; doc: string; page: number | null }[]; error?: string | null };
 }
 
 const auth = (token: string, extra?: HeadersInit): HeadersInit => ({ Authorization: `Bearer ${token}`, ...extra });
