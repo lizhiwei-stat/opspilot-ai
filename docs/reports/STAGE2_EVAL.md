@@ -12,13 +12,13 @@
 
 | 项 | 值 |
 |---|---|
-| 运行时间 | 2026-11-02 12:22:35（香港时间，UTC+8）；文件里记为 UTC `2026-11-02T04:22:35Z` |
+| 运行时间 | 2026-11-02 12:26:58（香港时间，UTC+8）；文件里记为 UTC `2026-11-02T04:26:58Z` |
 | 环境 | WSL2 Ubuntu 24.04；PostgreSQL 17.11 + pgvector 0.8.7（compose，宿主端口 5433）；宿主 `uv run`（Python 3.11.17） |
-| commit | `9316f3a4a22677a2dbc5851ee18ece1803368969` |
+| commit | `7beff6d0571f0d45dd02a475fc8c57ca261e478a`（之后的提交只改了文档和产物） |
 | 数据集 | `evals/datasets/retrieval_zh.jsonl`，55 条，sha256 `5ffd852d48c9…`，`label_source=synthetic` |
 | Embedding / 生成器 | `mock` / `mock-hash-embedding-v1`；`mock-extractive` |
 | 参数 | chunk_size=500, overlap=80, rrf_k=60, 每路候选 50, 重排候选 20, top_k=10, qa_min_evidence=0.5 |
-| 原始结果 | [`evals/results/20261102T042235Z_mock.json`](../../evals/results/20261102T042235Z_mock.json)（逐条结果 + Top-5）、[`.md`](../../evals/results/20261102T042235Z_mock.md)；同时写入 `eval_runs`（4 行）/ `eval_case_results`（220 行），前端「评测」页读取 |
+| 原始结果 | [`evals/results/20261102T042658Z_mock.json`](../../evals/results/20261102T042658Z_mock.json)（逐条结果 + Top-5）、[`.md`](../../evals/results/20261102T042658Z_mock.md)；同时写入 `eval_runs`（每次运行 4 行，每种模式 1 行）和 `eval_case_results`（每次运行 220 行），前端「评测」页读取 |
 
 复现：
 ```bash
@@ -31,10 +31,10 @@ uv run python evals/run_retrieval_eval.py        # 结果是确定性的：box �
 
 | 模式 | Recall@5 | MRR@10 | nDCG@10 | P50 ms | P95 ms | 失败率 | ACL 泄露块数 |
 |---|---|---|---|---|---|---|---|
-| vector | 0.888 | 0.855 | 0.872 | 2.79 | 3.39 | 0.0 | 0 |
-| keyword | 0.934 | 0.836 | 0.870 | 2.18 | 3.07 | 0.0 | 0 |
-| hybrid | 0.946 | 0.859 | 0.876 | 3.64 | 4.36 | 0.0 | 0 |
-| hybrid_rerank | 0.957 | 0.903 | 0.916 | 7.11 | 8.16 | 0.0 | 0 |
+| vector | 0.888 | 0.855 | 0.872 | 2.89 | 3.62 | 0.0 | 0 |
+| keyword | 0.934 | 0.836 | 0.870 | 2.28 | 3.1 | 0.0 | 0 |
+| hybrid | 0.946 | 0.859 | 0.876 | 3.73 | 4.37 | 0.0 | 0 |
+| hybrid_rerank | 0.957 | 0.903 | 0.916 | 7.11 | 8.52 | 0.0 | 0 |
 
 按类别的 Recall@5（无答案、无权限两类没有 gold，不参与计算）：
 
@@ -49,7 +49,7 @@ QA（hybrid_rerank + mock 抽取式，证据阈值 0.5）：
 - 无答案 / 无权限问题的正确拒答率：**0.833**（12 条中 10 条）
 - 可回答问题的作答率：**0.744**（43 条中 32 条）
 - 引用 ACL 泄露：**0**
-- QA 延迟 P50 / P95：7.71 / 9.54 ms
+- QA 延迟 P50 / P95：8.04 / 9.93 ms
 
 延迟口径：单条查询端到端，含查询向量化（mock，本地计算）、SQL、融合、重排，预热后测量。真实 embedding 需要一次网络调用，通常会增加几十到几百毫秒，**本阶段没有测量**。
 
@@ -75,7 +75,7 @@ QA（hybrid_rerank + mock 抽取式，证据阈值 0.5）：
 
 | 类别 | 内容 |
 |---|---|
-| ✅ 已实际验证 | 上表全部数字（WSL2 compose 栈，commit `9316f3a`）；gold 短语存在性校验通过（脚本运行时检查，失败会中止）；eval_runs 写入后前端评测页读取并展示（Windows Edge E2E，截图 `docs/assets/stage2-evals.png`）；同一脚本在 box 环境（PG 16.2 / pgvector 0.6.2）得到完全相同的质量指标 |
+| ✅ 已实际验证 | 上表全部数字（WSL2 compose 栈，commit `7beff6d`；在 `9316f3a` 上的上一次运行得到完全相同的质量指标，只有延迟差 ±0.4 ms）；gold 短语存在性校验通过（脚本运行时检查，失败会中止）；eval_runs 写入后前端评测页读取并展示（Windows Edge E2E，截图 `docs/assets/stage2-evals.png`）；同一脚本在 box 环境（PG 16.2 / pgvector 0.6.2）得到完全相同的质量指标 |
 | 🔍 仅静态检查 | 真实 embedding 评测路径（`--embedding real --i-understand-this-costs-money`）：代码审查 + 守卫逻辑（缺少开关会拒绝运行）已在本地确认会报错退出，**没有发起任何 API 调用** |
 | ⏳ 尚未验证 | 真实 text-embedding-v4 的检索质量与延迟；交叉编码器重排；人工标注的评测集；更大规模语料（HNSW 过滤后召回、延迟）；chunk_size / overlap / k / 阈值的参数扫描 |
 
