@@ -3,16 +3,24 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Key-loading policy (Stage 3 audit): OpsPilot reads configuration ONLY from its own process
+# environment (OPSPILOT_* variables) and its own repo-root .env. The path is anchored to this
+# repository, never the current working directory, so running a script from another
+# project's directory cannot pick up that project's .env. No code reads other projects' files.
+REPO_ROOT = Path(__file__).resolve().parents[4]
+OWN_ENV_FILE = REPO_ROOT / ".env"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="OPSPILOT_",
-        env_file=".env",
+        env_file=OWN_ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
         # Validation errors must never echo config values (DB URLs with passwords, API keys).
@@ -31,6 +39,8 @@ class Settings(BaseSettings):
     jwt_secret: SecretStr = SecretStr("dev-only-insecure-secret-change-me-0123456789")
     jwt_algorithm: Literal["HS256"] = "HS256"
     jwt_expire_minutes: int = 60
+    # tolerated clock skew for iat/nbf/exp (WSL2 realtime clock steps back several seconds)
+    jwt_clock_skew_s: int = Field(default=60, ge=0, le=300)
 
     llm_provider: Literal["mock", "openai_compatible"] = "mock"
     # mock = offline hash embedding (default) | local = free CPU sentence-transformers model

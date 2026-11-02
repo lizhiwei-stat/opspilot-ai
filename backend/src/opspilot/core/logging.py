@@ -38,7 +38,7 @@ def configure_logging(level: str = "INFO", json: bool = True) -> None:
     structlog.configure(
         processors=[*shared, structlog.processors.format_exc_info, renderer],
         wrapper_class=structlog.make_filtering_bound_logger(logging.getLevelName(level.upper())),
-        logger_factory=structlog.PrintLoggerFactory(sys.stdout),
+        logger_factory=structlog.PrintLoggerFactory(),  # current sys.stdout per logger
         cache_logger_on_first_use=False,
     )
     logging.basicConfig(level=level.upper(), stream=sys.stdout, format="%(message)s")

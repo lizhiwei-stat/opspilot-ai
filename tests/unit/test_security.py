@@ -46,7 +46,7 @@ def test_jwt_alg_none_rejected() -> None:
 
 
 def test_jwt_expired_rejected() -> None:
-    s = make_settings(jwt_expire_minutes=-1)
+    s = make_settings(jwt_expire_minutes=-5)  # beyond the 60 s clock-skew leeway
     token, _ = create_access_token(s, subject="u1", role="user")
     with pytest.raises(AuthError, match="expired"):
         decode_access_token(make_settings(), token)

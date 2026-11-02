@@ -25,8 +25,10 @@ def verify_password(raw: str, hashed: str) -> bool:
     return _hasher.verify(raw, hashed)
 
 
-def create_access_token(settings: Settings, *, subject: str, role: str) -> tuple[str, int]:
-    now = datetime.now(UTC)
+def create_access_token(
+    settings: Settings, *, subject: str, role: str, now: datetime | None = None
+) -> tuple[str, int]:
+    now = now or datetime.now(UTC)
     expires = settings.jwt_expire_minutes * 60
     payload: dict[str, Any] = {
         "sub": subject,
@@ -51,6 +53,10 @@ def decode_access_token(settings: Settings, token: str) -> dict[str, Any]:
             algorithms=[settings.jwt_algorithm],
             issuer="opspilot",
             options={"require": ["exp", "sub", "iss"]},
+            # Root cause of the intermittent 401 right after login (Stage 3 pre-work): the WSL2
+            # VM realtime clock steps backwards by several seconds, so a token issued a moment
+            # ago has iat/nbf "in the future" -> ImmatureSignatureError. Tolerate bounded skew.
+            leeway=settings.jwt_clock_skew_s,
         )
     except jwt.ExpiredSignatureError as exc:
         _log.info("auth_token_rejected", reason=type(exc).__name__)
