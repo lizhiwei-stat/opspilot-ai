@@ -250,7 +250,11 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
                 upd = dict(cmd.update or {})
                 upd["steps"] = steps if name != "guard_in" else 1
                 detail = upd.pop("_detail", {})
-                upd["node_trace"] = [_trace(state, name, t0, upd.pop("_status", "ok"), detail)]
+                pre = upd.pop("_pre_trace", [])
+                upd["node_trace"] = [
+                    *pre,
+                    _trace(state, name, t0, upd.pop("_status", "ok"), detail),
+                ]
                 return Command(update=upd, goto=cmd.goto)
 
             run.__name__ = name
@@ -498,20 +502,32 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
             or state.get("tool_calls", 0) >= s.agent_max_tool_calls
         )
         decision = a.decision
+        trecs = _turn_items(state, "tool_records")
+        ok_tools = {r["tool"] for r in trecs if r["status"] in ("ok", "duplicate")}
+        failed = [r for r in trecs if r["status"] not in ("ok", "duplicate")]
+        required = [
+            st["tool"]
+            for st in state["plan"]["steps"]
+            if st["action"] == "tool" and st.get("tool") != "create_ticket_draft"
+        ]
+        failed_required = [r for r in failed if r["tool"] in required and r["tool"] not in ok_tools]
+        if failed:
+            a.reasons.append(
+                "tool_failures:" + ",".join(f"{r['tool']}={r['error_class']}" for r in failed)
+            )
         if decision == "need_tools" and (limits_hit or state.get("agent_idle")):
-            failed = [
-                r
-                for r in _turn_items(state, "tool_records")
-                if r["status"] not in ("ok", "duplicate")
-            ]
             a.reasons.append("tool_limit_reached" if limits_hit else "no_further_tool_available")
-            if failed:
-                a.reasons.append(
-                    "tool_failures:" + ",".join(f"{r['tool']}={r['error_class']}" for r in failed)
-                )
-                a.missing.append("所需工具调用失败，未能取得证据")
             decision = "refuse"
-            a.decision = "refuse"  # type: ignore[assignment]
+        elif decision == "sufficient" and failed_required:
+            # a required tool (e.g. logs) failed or was denied: do not answer from KB alone
+            a.reasons.append("required_tool_failed")
+            decision = "refuse"
+        if decision == "refuse" and failed_required:
+            a.missing.append(
+                "所需工具未能取得证据："
+                + "、".join(f"{r['tool']}（{r['error_class']}）" for r in failed_required)
+            )
+        a.decision = decision  # type: ignore[assignment]
         a.checks["qa_gate"] = gate
         goto = {
             "sufficient": "generate",
@@ -676,7 +692,22 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
         drafts = [
             o for o in _turn_items(state, "tool_outputs") if o["tool"] == "create_ticket_draft"
         ]
+        last_ai = next(
+            (m for m in reversed(state.get("messages", [])) if isinstance(m, AIMessage)), None
+        )
+        batch = {tc["id"] for tc in (last_ai.tool_calls if last_ai else [])}
+        batch_recs = [r for r in _turn_items(state, "tool_records") if r["call_id"] in batch]
+        tools_trace = {
+            "turn": state.get("turn", 0),
+            "node": "tools",
+            "status": "ok"
+            if all(r["status"] in ("ok", "duplicate") for r in batch_recs)
+            else "error",
+            "ms": round(sum(r["duration_ms"] for r in batch_recs), 2),
+            "detail": {"calls": [(r["tool"], r["status"]) for r in batch_recs]},
+        }
         upd: dict[str, Any] = {
+            "_pre_trace": [tools_trace],
             "tool_records": extra,
             "_detail": {
                 "tool_results": [

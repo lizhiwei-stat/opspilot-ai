@@ -143,7 +143,7 @@ def test_seed_creates_acl_and_is_idempotent(seeded: Session) -> None:
     spec = importlib.util.spec_from_file_location("seed_again", path)
     mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
     spec.loader.exec_module(mod)  # type: ignore[union-attr]
-    assert mod.seed(seeded) == {"users": 0, "knowledge_bases": 0, "kb_permissions": 0}
+    assert mod.seed(seeded) == {"users": 0, "knowledge_bases": 0, "kb_permissions": 0, "tickets": 0}
     after = [
         seeded.scalar(select(func.count()).select_from(t))
         for t in (User, KnowledgeBase, KbPermission)

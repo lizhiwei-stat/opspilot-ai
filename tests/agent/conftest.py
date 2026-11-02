@@ -71,7 +71,7 @@ def session_factory(agent_db: dict[str, Any]) -> Iterator[Callable[[], Session]]
 
 
 @pytest.fixture
-def run_agent(agent_db: dict[str, Any], session_factory: Callable[[], Session]):  # noqa: ANN201
+def run_agent(agent_db: dict[str, Any], session_factory: Callable[[], Session]):
     """run_agent(question, user='alice', **opts) -> final state (in-memory checkpointer)."""
 
     def _run(
