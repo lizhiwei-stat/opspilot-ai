@@ -93,6 +93,7 @@ def _est_tokens(text: str) -> int:
 
 # ===================================================================== mock
 _SENT = re.compile(r"[^。！？!?\n]+[。！？!?]?")
+_CODES = re.compile(r"(?<![A-Za-z0-9])(?:[A-Z]{2,6}-\d{3,5}|ERR_[A-Z_]+|v\d+(?:\.\d+)*)")
 
 
 class MockAgentLLM:
@@ -187,13 +188,15 @@ class MockAgentLLM:
             return (
                 len(q & set(rules._content_tokens(s)))
                 + 5 * sum(c in s for c in codes)
-                + (3 if wants_value and re.search(r"\d", rules.ERROR_CODE.sub("", s)) else 0)
+                + (3 if wants_value and re.search(r"\d", _CODES.sub("", s)) else 0)
                 - (5 if s.lstrip().startswith(("#", "|---", "| 错误码")) else 0)
             )
 
         lines, cites = [], []
         for i, e in enumerate(evidence, 1):
-            sents = [s.strip() for s in _SENT.findall(e["text"]) if len(s.strip()) > 3]
+            # PDF text wraps mid-sentence: re-join soft line breaks (keep markdown structure)
+            body = re.sub(r"\n(?![#|\-\n*]|\d+[.、])", "", e["text"])
+            sents = [s.strip() for s in _SENT.findall(body) if len(s.strip()) > 3]
             if e["source"] == "tool":  # tool summaries are short facts: quote the first line
                 sents = [e["text"].split("\n")[0].strip()]
             if not sents:

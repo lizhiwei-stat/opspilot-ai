@@ -482,21 +482,38 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
         gate = (state.get("assessment") or {}).get("qa_gate") or (
             state.get("assessment") or {}
         ).get("checks", {}).get("qa_gate", {})
-        a = assess_evidence(
-            question=state["question"],
-            intent=c["intent"],
-            entities=c["entities"],
-            evidence=evs,
-            tool_records=_turn_items(state, "tool_records"),
-            qa_gate=gate or {},
-            presence=presence_for(state),
-            tools_available=allowed,
-            required_tools=[
-                st["tool"]
-                for st in state["plan"]["steps"]
-                if st["action"] == "tool" and st.get("tool") != "create_ticket_draft"
-            ],
-        )
+
+        def _assess(judge: dict[str, Any] | None = None) -> Any:
+            return assess_evidence(
+                question=state["question"],
+                intent=c["intent"],
+                entities=c["entities"],
+                evidence=evs,
+                tool_records=_turn_items(state, "tool_records"),
+                qa_gate=gate or {},
+                presence=presence_for(state),
+                tools_available=allowed,
+                required_tools=[
+                    st["tool"]
+                    for st in state["plan"]["steps"]
+                    if st["action"] == "tool" and st.get("tool") != "create_ticket_draft"
+                ],
+                judge=judge,
+            )
+
+        a = _assess()
+        judge_usage = Usage()
+        degraded_j = list(state.get("degraded") or [])
+        if a.decision == "sufficient" and s.agent_llm_judge and not llm.is_mock:
+            # optional second opinion: may only tighten; its confidence is never used
+            (jd, judge_usage), degraded_j = llm_call(
+                state,
+                "judge",
+                lambda: llm.judge(state["question"], evs[:6]),
+                lambda: (None, Usage()),
+            )
+            if jd is not None:
+                a = _assess(jd)
         limits_hit = (
             state.get("react_rounds", 0) >= s.agent_max_react_rounds
             or state.get("tool_calls", 0) >= s.agent_max_tool_calls
@@ -536,6 +553,8 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
             "refuse": "refuse",
         }[decision]
         upd: dict[str, Any] = {
+            **_usage_update(state, judge_usage),
+            "degraded": degraded_j,
             "assessment": {**a.model_dump(), "qa_gate": gate},
             "evidence": evs,
             "_detail": {

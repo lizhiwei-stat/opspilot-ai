@@ -114,6 +114,7 @@ class AgentService:
                 "draft_result": v.get("draft_result"),
                 "interrupt": interrupts[0] if interrupts else None,
                 "refusal_reason": final.get("refusal_reason"),
+                "final_status": final.get("status"),
                 "policy_violations": final.get("policy_violations") or [],
             }
             run.step_count = len(trace)
@@ -266,6 +267,7 @@ class AgentService:
                     k: a.get(k) for k in ("decision", "reasons", "missing", "contradictions")
                 },
                 "refusal_reason": a.get("refusal_reason"),
+                "final_status": a.get("final_status"),
                 "policy_violations": a.get("policy_violations") or [],
                 "degraded": a.get("degraded") or [],
                 "tools": [
@@ -274,6 +276,7 @@ class AgentService:
                         "status": t.status,
                         "args": t.arguments,
                         "result": (t.result or {}).get("summary"),
+                        "deduplicated": bool((t.result or {}).get("deduplicated")),
                         "error_class": t.error,
                         "attempt": t.attempt,
                         "duration_ms": t.duration_ms,

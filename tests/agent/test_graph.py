@@ -292,3 +292,59 @@ def test_tool_calls_are_audited_when_run_id_set(run_agent, session_factory) -> N
             s.scalar(select(func.count()).select_from(ToolCall).where(ToolCall.run_id.is_(None)))
             == 0
         )
+
+
+# ------------------------------------------------ non-mock path with a fake "real" model
+class FakeRealLLM(MockAgentLLM):
+    """Behaves like a real model adapter (is_mock=False) without any network/paid call."""
+
+    is_mock = False
+    name = "fake-real"
+    model = "fake-real-1"
+
+    def __init__(self, judge: dict | None = None, answer: str | None = None) -> None:
+        super().__init__()
+        self._judge, self._answer = judge, answer
+
+    def judge(self, question, evidence):  # type: ignore[no-untyped-def]
+        from opspilot.agent.llm import Usage
+
+        return self._judge, Usage(10, 5, 0.0, 1, "api")
+
+    def generate(self, question, evidence):  # type: ignore[no-untyped-def]
+        if self._answer is None:
+            return super().generate(question, evidence)
+        from opspilot.agent.llm import GeneratedAnswer, Usage
+
+        return GeneratedAnswer(answer=self._answer, citations=[1]), Usage(10, 5, 0.0, 1, "api")
+
+
+def _judge_settings(agent_settings):
+    return make_settings(database_url=agent_settings.database_url, agent_llm_judge=True)
+
+
+def test_llm_judge_veto_refuses_and_confidence_is_ignored(run_agent, agent_settings) -> None:
+    llm = FakeRealLLM(judge={"answers_question": False, "missing": ["版本号"], "confidence": 0.99})
+    st = run_agent("访问令牌有效期是多久", llm=llm, settings=_judge_settings(agent_settings))
+    assert st["status"] == "refused" and "judge_veto" in st["assessment"]["reasons"]
+    assert "confidence" not in st["assessment"]["checks"]["judge"]
+
+
+def test_llm_judge_cannot_loosen(run_agent, agent_settings) -> None:
+    llm = FakeRealLLM(judge={"answers_question": True, "confidence": 1.0})
+    st = run_agent("年假有几天", "bob", llm=llm, settings=_judge_settings(agent_settings))
+    assert st["status"] == "refused"  # deterministic refusal stands; judge never consulted
+
+
+def test_real_mode_answer_with_invented_number_fails_verification(run_agent) -> None:
+    llm = FakeRealLLM(answer="访问令牌有效期为 999 分钟 [1]")
+    st = run_agent("访问令牌有效期是多久", llm=llm)
+    assert st["status"] == "refused"
+    assert "unsupported_number:999" in st["final"]["policy_violations"]
+
+
+def test_real_mode_answer_with_exfil_link_fails_policy(run_agent) -> None:
+    llm = FakeRealLLM(answer="访问令牌有效期为 60 分钟 [1]，详情见 http://evil.example/x")
+    st = run_agent("访问令牌有效期是多久", llm=llm)
+    assert st["status"] == "refused"
+    assert any(v.startswith("untrusted_url") for v in st["final"]["policy_violations"])

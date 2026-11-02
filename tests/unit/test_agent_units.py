@@ -94,6 +94,8 @@ def test_error_code_requires_tool() -> None:
 
 def test_rules_ticket_number_is_not_an_error_code() -> None:
     assert rules.entities("TCK-0001 和 ORD-5003")["error_codes"] == ["ORD-5003"]
+    e = rules.entities("日志出现ORD-5003，工单TCK-0002")  # no spaces around codes
+    assert e["error_codes"] == ["ORD-5003"] and e["tickets"] == ["TCK-0002"]
     assert rules.explicit_ticket_request("帮我创建一个工单")
     assert not rules.explicit_ticket_request("工单系统怎么用")
 

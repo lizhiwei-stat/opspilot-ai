@@ -11,8 +11,10 @@ import re
 
 import jieba
 
-ERROR_CODE = re.compile(r"\b(?:(?!TCK-)[A-Z]{2,6}-\d{3,5}|ERR_[A-Z_]{3,40})\b")
-TICKET_NO = re.compile(r"\bTCK-\d{4}\b")
+# lookarounds instead of \b: in "报ORD-5003" the CJK char and "O" are both \w (no boundary)
+_L, _R = r"(?<![A-Za-z0-9_])", r"(?![A-Za-z0-9_])"
+ERROR_CODE = re.compile(_L + r"(?:(?!TCK-)[A-Z]{2,6}-\d{3,5}|ERR_[A-Z_]{3,40})" + _R)
+TICKET_NO = re.compile(_L + r"TCK-\d{4}" + _R)
 _LOG_WORDS = re.compile(
     r"日志|log|trace|报错记录|错误记录|最近.{0,6}(错误|报错|异常)|告警记录", re.I
 )

@@ -40,7 +40,7 @@ _ANY_NUM = re.compile(r"\d|[一二两三四五六七八九十百千]+\s*(秒|分
 _CHANGED_TO = re.compile(r"(?:调整为|改为|恢复为|变更为|提高到|降低到|调到)\s*(\d+(?:\.\d+)?)")
 _BARE_NUM = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)(?![\w.])")
 
-_CODE_LIKE = re.compile(r"\b(?:[A-Z]{2,6}-\d{3,5}|ERR_[A-Z_]+|v\d+(?:\.\d+)*)\b")
+_CODE_LIKE = re.compile(r"(?<![A-Za-z0-9])(?:[A-Z]{2,6}-\d{3,5}|ERR_[A-Z_]+|v\d+(?:\.\d+)*)")
 
 
 def _strip_codes(s: str) -> str:

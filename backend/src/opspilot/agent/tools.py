@@ -590,7 +590,12 @@ class ToolGuard:
                         tool_name=rec["tool"][:64],
                         transport="inprocess",
                         arguments=_summary(raw_args),
-                        result={"summary": rec["result_summary"]} if out is not None else None,
+                        result={
+                            "summary": rec["result_summary"],
+                            "deduplicated": rec["status"] == "duplicate",
+                        }
+                        if out is not None
+                        else None,
                         status=_db_status(rec["status"]),
                         attempt=max(1, rec["attempts"]),
                         error=rec["error_class"],
