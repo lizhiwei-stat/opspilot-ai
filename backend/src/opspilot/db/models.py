@@ -367,10 +367,11 @@ class TicketDraft(TimestampMixin, Base):
     __tablename__ = "ticket_drafts"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('pending_approval','approved','rejected','executed','expired')",
+            "status IN ('pending_approval','approved','rejected','returned','executed','expired')",
             name="status_valid",
         ),
         CheckConstraint("action IN ('create','update')", name="action_valid"),
+        CheckConstraint("revision >= 1 AND revision <= 10", name="revision_valid"),
         CheckConstraint("priority IN ('P1','P2','P3','P4')", name="priority_valid"),
         Index("ix_ticket_drafts_status_created", "status", "created_at"),
     )
@@ -393,12 +394,19 @@ class TicketDraft(TimestampMixin, Base):
     # (thread, tool, canonical args) hash: a replayed/duplicated tool call cannot create a
     # second draft (Stage 3 resume safety)
     idempotency_key: Mapped[str | None] = mapped_column(String(40), unique=True)
+    # Stage 4: return-for-revision creates a new draft version linked to its parent
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    parent_draft_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ticket_drafts.id", ondelete="SET NULL")
+    )
+    target_status: Mapped[str | None] = mapped_column(String(16))  # action='update'
+    thread_id: Mapped[str | None] = mapped_column(String(64))
 
 
 class Approval(Base):
     __tablename__ = "approvals"
     __table_args__ = (
-        CheckConstraint("decision IN ('approved','rejected')", name="decision_valid"),
+        CheckConstraint("decision IN ('approved','rejected','returned')", name="decision_valid"),
         UniqueConstraint("draft_id", name="uq_approvals_draft_id"),
     )
 
@@ -476,6 +484,76 @@ class AuditLog(Base):
     resource_id: Mapped[str | None] = mapped_column(String(64))
     request_id: Mapped[str | None] = mapped_column(String(64))
     details: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# ---------------------------------------------------------------- stage 4: MCP audit
+class McpToolAudit(Base):
+    """One row per MCP tool invocation, written by the executing MCP server (side='server')
+    or by the backend client when the call never reached a server (side='client':
+    timeout / unavailable / rejected before sending). Arguments are summarized + redacted;
+    no tokens, passwords or API keys are ever stored."""
+
+    __tablename__ = "mcp_tool_audit"
+    __table_args__ = (
+        CheckConstraint("side IN ('server','client')", name="side_valid"),
+        CheckConstraint(
+            "status IN ('ok','error','denied','invalid','timeout','unavailable','replay')",
+            name="status_valid",
+        ),
+        Index("ix_mcp_tool_audit_thread_created", "thread_id", "created_at"),
+        Index("ix_mcp_tool_audit_user_created", "user_id", "created_at"),
+        Index("ix_mcp_tool_audit_tool_created", "tool", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    side: Mapped[str] = mapped_column(String(8), nullable=False)
+    server: Mapped[str] = mapped_column(String(32), nullable=False)
+    tool: Mapped[str] = mapped_column(String(64), nullable=False)
+    transport: Mapped[str] = mapped_column(String(16), nullable=False, default="stdio")
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    user_role: Mapped[str | None] = mapped_column(String(16))
+    thread_id: Mapped[str | None] = mapped_column(String(64))
+    run_id: Mapped[str | None] = mapped_column(String(64))
+    call_id: Mapped[str | None] = mapped_column(String(64))
+    jti: Mapped[str | None] = mapped_column(String(64))
+    args_summary: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    args_sha256: Mapped[str | None] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    error_class: Mapped[str | None] = mapped_column(String(32))
+    error: Mapped[str | None] = mapped_column(Text)
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    output_bytes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    idempotency_key: Mapped[str | None] = mapped_column(String(40))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class TicketEvent(Base):
+    """Ticket status transitions (and creation from an approved draft), with the approval
+    that authorized them. Unique (approval_id): one approval executes at most once."""
+
+    __tablename__ = "ticket_events"
+    __table_args__ = (
+        UniqueConstraint("approval_id", name="uq_ticket_events_approval_id"),
+        Index("ix_ticket_events_ticket_created", "ticket_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ticket_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False
+    )
+    draft_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("ticket_drafts.id"))
+    approval_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("approvals.id"))
+    from_status: Mapped[str | None] = mapped_column(String(16))
+    to_status: Mapped[str] = mapped_column(String(16), nullable=False)
+    actor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    approver_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -355,6 +355,7 @@ def _draft(s: Session, user: User, a: BaseModel, ctx: ToolContext) -> BaseModel:
             status="pending_approval",
             created_by=user.id,
             idempotency_key=key,
+            thread_id=ctx.thread_id or None,
         )
         s.add(d)
         try:

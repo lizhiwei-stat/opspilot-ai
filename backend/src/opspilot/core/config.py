@@ -106,6 +106,17 @@ class Settings(BaseSettings):
     agent_llm_judge: bool = False  # real mode only: LLM second opinion in the evidence node
     agent_checkpoint_auto_setup: bool = True  # PostgresSaver.setup() on first agent use
     agent_fault_injection: bool = False  # eval/test only: lets scenarios inject tool faults
+    # ---- MCP (Stage 4) ----
+    # "mcp": agent tools execute in the 3 MCP servers (real protocol, stdio subprocesses);
+    # "inprocess": Stage 3 direct calls (unit tests / fallback)
+    agent_tool_transport: Literal["mcp", "inprocess"] = "mcp"
+    mcp_call_timeout_s: float = Field(default=8.0, ge=0.1, le=120)
+    mcp_connect_timeout_s: float = Field(default=20.0, ge=1, le=120)
+    mcp_max_output_bytes: int = Field(default=65536, ge=1024, le=4 * 1024 * 1024)
+    mcp_caller_token_ttl_s: int = Field(default=30, ge=5, le=300)
+    mcp_max_revisions: int = Field(default=2, ge=0, le=5)  # return-for-revision rounds
+    # Streamable HTTP (optional transport): loopback only, bearer token, Origin allowlist
+    mcp_http_allowed_origins: tuple[str, ...] = ()
     model_ledger_path: str = "data/ledger/model_calls.jsonl"
     model_price_table: str = "configs/model_prices.json"
 
