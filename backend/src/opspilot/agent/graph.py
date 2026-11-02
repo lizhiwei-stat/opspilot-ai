@@ -1083,6 +1083,7 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
                 )
             result["business_op"] = {"ok": True, **out.model_dump()}
             result["ticket_number"] = out.ticket_number
+            result["status"] = out.draft_status  # approved -> executed by the business op
             msg = (
                 f"审批通过（审批人 {reviewer_email}），"
                 f"已通过 Ticket MCP 创建工单 {out.ticket_number}"
