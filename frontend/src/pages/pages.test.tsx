@@ -145,7 +145,7 @@ describe("Evals page", () => {
     mockFetch((url) => {
       if (url.endsWith("/api/v1/evals/runs")) return { body: [RUN] };
       if (url.endsWith("/api/v1/evals/runs/r1"))
-        return { body: { ...RUN, cases: [{ case_id: "q001", label_source: "synthetic", recall_at_5: 1, latency_ms: 3, details: { category: "exact_keyword", failure_category: "hit", mrr_at_10: 1, top: [{ rank: 1, doc: "guide.pdf", page: 2 }] } }] } };
+        return { body: { ...RUN, cases: [{ case_id: "q001", label_source: "synthetic", recall_at_5: 1, latency_ms: 3, details: { category: "exact_keyword", failure_category: "ok", mrr_at_10: 1, top: [{ rank: 1, doc: "guide.pdf", page: 2 }] } }] } };
       return undefined;
     });
     render(<Evals token="t" />);
@@ -155,7 +155,7 @@ describe("Evals page", () => {
     fireEvent.click(screen.getAllByText("hybrid").at(-1)!);
     await screen.findByText("q001");
     expect(screen.getByText("guide.pdf#p2")).toBeTruthy();
-    expect(screen.getByText("hit")).toBeTruthy();
+    expect(screen.getByText("ok")).toBeTruthy();
   });
 
   it("shows mock and real embedding runs side by side per split", async () => {

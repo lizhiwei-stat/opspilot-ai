@@ -140,7 +140,7 @@ export default function Evals({ token }: { token: string }) {
                   <td>{fmt(c.recall_at_5, 2)}</td>
                   <td>{fmt(c.details.mrr_at_10, 2)}</td>
                   <td>{c.latency_ms}</td>
-                  <td>{c.details.failure_category ? <Badge tone={c.details.failure_category === "hit" ? "green" : "amber"}>{String(c.details.failure_category)}</Badge> : "–"}</td>
+                  <td>{c.details.failure_category ? <Badge tone={c.details.failure_category === "ok" ? "green" : "amber"}>{String(c.details.failure_category)}</Badge> : "–"}</td>
                   <td className="text-slate-500">{c.details.top?.slice(0, 3).map((t) => `${t.doc}${t.page ? `#p${t.page}` : ""}`).join("，") || "（无结果）"}</td>
                 </tr>
               ))}
