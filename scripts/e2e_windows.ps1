@@ -25,3 +25,10 @@ $extra = @(); if ($Shots) { $extra = @("--screenshots", $Shots) }
 & $uv run -q --no-project --python 3.11 --with playwright==1.64.1 python $rag `
   --url $Url --email alice@opspilot.local --channel msedge @extra
 Remove-Item Env:OPSPILOT_E2E_PASSWORD
+# Stage 3: Agent workbench (alice + admin approval).
+$ag = "$env:TEMP\agent_e2e.py"
+Copy-Item -Force "$share\frontend\e2e\agent_e2e.py" $ag
+$env:OPSPILOT_E2E_USER_PASSWORD = Get-Val "OPSPILOT_SEED_USER_PASSWORD"
+$env:OPSPILOT_E2E_ADMIN_PASSWORD = Get-Val "OPSPILOT_SEED_ADMIN_PASSWORD"
+& $uv run -q --no-project --python 3.11 --with playwright==1.64.1 python $ag --url $Url --channel msedge @extra
+Remove-Item Env:OPSPILOT_E2E_USER_PASSWORD, Env:OPSPILOT_E2E_ADMIN_PASSWORD

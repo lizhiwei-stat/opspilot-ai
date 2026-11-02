@@ -214,6 +214,7 @@ def evaluate(sc: dict, res: dict, sf: Any) -> dict:
         and sc["category"] not in ("approval",)
         and last.get("intent") not in ("chitchat",)
         and last.get("status") == "completed"
+        and not last.get("draft")  # approval confirmations are not knowledge answers
     )
     verify_ok = any(
         n["node"] == "verify" and n["status"] == "ok" for n in last.get("node_trace", [])
