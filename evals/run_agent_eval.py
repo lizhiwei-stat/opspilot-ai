@@ -363,6 +363,7 @@ def main() -> int:
         "provider": a.provider,
         "model": "mock-agent-v1" if a.provider == "mock" else s.agent_llm_model,
         "dataset": str(DATASET.relative_to(ROOT)),
+        "tool_transport": "mcp-stdio" if s.agent_tool_transport == "mcp" else "inprocess",
         "generated_at": ts,
         "metrics": m,
         "rows": rows,
