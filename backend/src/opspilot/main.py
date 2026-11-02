@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import sessionmaker
 
 from opspilot import __version__
-from opspilot.api.routes import auth, health, system
+from opspilot.api.routes import auth, evals, health, knowledge, search, system
 from opspilot.core.config import Settings, get_settings
 from opspilot.core.errors import register_error_handlers
 from opspilot.core.logging import configure_logging, get_logger
@@ -45,7 +45,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.add_middleware(RequestContextMiddleware)
     register_error_handlers(app)
-    for r in (health.router, system.router, auth.router):
+    for r in (
+        health.router,
+        system.router,
+        auth.router,
+        knowledge.router,
+        search.router,
+        evals.router,
+    ):
         app.include_router(r)
     get_logger().info(
         "app_started", env=settings.env, llm=settings.llm_provider, emb=settings.embedding_provider

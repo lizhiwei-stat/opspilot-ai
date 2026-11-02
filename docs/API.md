@@ -9,7 +9,7 @@ Base URL：`http://localhost:8000`。交互式文档：`/docs`（Swagger）、`/
 ```
 错误码：`validation_error`(422) `unauthorized`(401) `forbidden`(403) `not_found`(404) `conflict`(409) `dependency_unavailable`(503) `internal_error`(500)。
 
-状态列：✅ 阶段 1 已实现并测试；🔜 计划阶段。
+状态列：✅ 已实现并测试；🔜 计划阶段。
 
 ## 系统 / 健康
 | 方法 | 路径 | 权限 | 说明 | 状态 |
@@ -26,16 +26,24 @@ Base URL：`http://localhost:8000`。交互式文档：`/docs`（Swagger）、`/
 | GET | `/api/v1/auth/me` | 登录 | 当前用户 | ✅ |
 | GET/POST/PATCH | `/api/v1/users` | admin | 用户管理 | 🔜 5 |
 
-## 知识库（阶段 2）
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| GET/POST | `/api/v1/knowledge-bases` | 列出（按 ACL）/ 创建（admin） |
-| PUT/DELETE | `/api/v1/knowledge-bases/{kb_id}/permissions/{user_id}` | 授权 / 撤销 |
-| POST | `/api/v1/knowledge-bases/{kb_id}/documents` | multipart 上传 PDF/MD/TXT；同名即新版本 |
-| GET | `/api/v1/knowledge-bases/{kb_id}/documents` | 文档列表 + 索引状态 |
-| GET | `/api/v1/documents/{doc_id}` · `/versions` · `/chunks` | 详情、版本、分块 |
-| DELETE | `/api/v1/documents/{doc_id}` | 软删除，分块失效 |
-| POST | `/api/v1/search` | `{query, kb_ids?, mode: basic|hybrid, top_k, rerank?}` → 带引用位置的片段 |
+## 知识库与检索（阶段 2）✅
+权限：读 = admin / public / owner / `kb_permissions` 授权；写 = admin / owner / `write|admin` 授权。无读权限一律 **404**（不暴露资源是否存在），有读无写 **403**。
+
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| GET | `/api/v1/knowledge-bases` | 登录 | 只返回可读的知识库：`{id, slug, name, description, visibility, document_count, chunk_count, can_write}` |
+| GET | `/api/v1/knowledge-bases/{kb_id}/documents` | 读 | 文档列表：`current_version, latest_status, latest_error, chunk_count` |
+| POST | `/api/v1/knowledge-bases/{kb_id}/documents` | 写 | multipart：`file`（必填）、`title`（可选）。超过 `OPSPILOT_MAX_UPLOAD_MB` → **413**。其余情况 200，返回 `{status: indexed|duplicate|failed, message, chunk_count, document{…, versions[]}}`；`failed` 时 `document.latest_error = "[错误码] 中文说明"`，失败版本会保留下来供查看 |
+| GET | `/api/v1/documents/{doc_id}` | 读 | 详情 + 全部版本（`index_status: indexing/indexed/failed/superseded`、sha256、embedding_model） |
+| GET | `/api/v1/documents/{doc_id}/chunks?offset&limit` | 读 | 当前版本分块：`content, page_number, heading_path, char_start, char_end, search_tokens` |
+| POST | `/api/v1/documents/{doc_id}/reindex` | 写 | 按当前 embedding 模型重新分块与向量化；失败 **422**，原索引保留 |
+| DELETE | `/api/v1/documents/{doc_id}` | 写 | 软删除文档，硬删除分块：`{status: deleted, removed_chunks}` |
+| POST | `/api/v1/search` | 登录 | `{query, mode: vector|keyword|hybrid|hybrid_rerank, top_k≤50, kb_ids?}` → `{tokens, candidates[{chunk_id, rank, score, content, document_name, version, kb_slug, page_number, heading_path, char_start, char_end, suspicious, scores{vector,keyword,rrf,rerank}, ranks{…}}], timings_ms, embedding_model, reranker}` |
+| POST | `/api/v1/qa` | 登录 | `{question, top_k≤20, kb_ids?}` → `{answer, generator, is_mock, evidence_sufficient, evidence_score, threshold, citations[{index, chunk_id, document_name, kb_slug, version, page_number, locator, evidence, quote}], flagged_chunks, candidates, timings_ms}` |
+
+上传解析错误码：`unsupported_type` `empty_file` `too_large` `content_mismatch` `binary_content` `decode_failed` `pdf_encrypted` `pdf_corrupt` `pdf_no_text` `no_chunks` `embedding_failed`。
+
+🔜 知识库创建 / 授权管理接口（`POST /knowledge-bases`、`PUT/DELETE …/permissions/{user_id}`）放在阶段 5 管理界面，目前由种子脚本创建。
 
 ## Agent（阶段 3–4）
 | 方法 | 路径 | 说明 |
@@ -58,8 +66,9 @@ Base URL：`http://localhost:8000`。交互式文档：`/docs`（Swagger）、`/
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/v1/dashboard/summary` | 工单、运行、工具成功率等真实聚合 |
-| GET/POST | `/api/v1/evals/runs` | 列表 / 触发评测（admin） |
-| GET | `/api/v1/evals/runs/{id}` | 指标 + 逐条结果 |
+| GET | `/api/v1/evals/runs` | ✅ 阶段 2：评测运行列表（指标、配置、commit、mock 警告） |
+| GET | `/api/v1/evals/runs/{id}` | ✅ 阶段 2：指标 + 逐条结果 |
+| POST | `/api/v1/evals/runs` | 🔜 触发评测（admin）；目前通过 `evals/run_retrieval_eval.py` 离线运行 |
 
 ## MCP Server（阶段 4，独立进程）
 工具：`search_knowledge`、`query_mock_logs`、`get_ticket`、`create_ticket_draft`。输入输出以 Pydantic 模型声明；调用方身份通过服务端令牌传入并做 ACL 校验；不提供任何直接创建正式工单的工具。

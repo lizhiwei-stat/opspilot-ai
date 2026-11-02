@@ -25,6 +25,13 @@ def version(settings: SettingsDep) -> VersionOut:
             else settings.embedding_model
         ),
         embedding_dim=settings.embedding_dim,
+        rag={
+            "chunk_size": settings.chunk_size,
+            "chunk_overlap": settings.chunk_overlap,
+            "rrf_k": settings.rrf_k,
+            "reranker": "lexical-overlap-v1",
+            "qa_min_evidence": settings.qa_min_evidence,
+        },
     )
 
 

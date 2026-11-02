@@ -9,8 +9,11 @@ COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY backend ./backend
 COPY scripts ./scripts
+COPY evals ./evals
 COPY alembic.ini ./
-RUN uv sync --frozen --no-dev && useradd -r -u 10001 app && chown -R app /app
+# data/uploads is a named volume (original files of every document version).
+RUN uv sync --frozen --no-dev && useradd -r -u 10001 app && mkdir -p /app/data/uploads \
+    && chown -R app /app
 USER app
 EXPOSE 8000
 # Run the venv binaries directly (no `uv run` at runtime: the non-root user has no uv cache dir).

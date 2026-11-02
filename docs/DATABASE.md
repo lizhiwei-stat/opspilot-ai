@@ -38,12 +38,12 @@ erDiagram
 | 表 | 主要列 | 约束 / 索引 | 用途 |
 |---|---|---|---|
 | `documents` | kb_id, source_name, title, mime_type, status(active/deleted), current_version, uploaded_by | `uq(kb_id, source_name)`；`ix(kb_id)` | 逻辑文档 |
-| `document_versions` | document_id, version, content_sha256, size_bytes, storage_path, index_status(pending/indexing/indexed/failed), error_message, chunk_count, embedding_model | `uq(document_id, version)`；`ix(content_sha256)` | 每次上传一个版本；哈希去重 |
-| `chunks` | kb_id, document_id, document_version_id, chunk_index, content, search_text, **tsv**, **embedding vector(1024)**, page_number, heading_path, char_start, char_end, token_count, is_active | `uq(document_version_id, chunk_index)`；`ix(kb_id,is_active)`；**GIN(tsv)**；**HNSW(embedding vector_cosine_ops, m=16, ef_construction=64)** | 检索单元 |
+| `document_versions` | document_id, version, content_sha256, size_bytes, storage_path, index_status(pending/indexing/indexed/failed/**superseded**), error_message, chunk_count, embedding_model | `uq(document_id, version)`；`ix(content_sha256)` | 每次上传一个版本；哈希去重 |
+| `chunks` | kb_id, document_id, document_version_id, chunk_index, content, search_text, **tsv**, **embedding vector(1024)**, page_number, heading_path, char_start, char_end, token_count, is_active | `uq(document_version_id, chunk_index)`；`ix(kb_id,is_active)`；`ix(document_version_id)`、`ix(document_id)`（迁移 0002）；**GIN(tsv)**；**HNSW(embedding vector_cosine_ops, m=16, ef_construction=64)** | 检索单元 |
 
 - `tsv` 是生成列：`to_tsvector('simple', search_text)` STORED。`search_text` 由应用写入（中文先分词，以空格连接），见 ARCHITECTURE ADR-02。
 - 可定位位置 = `document.source_name` + `version` + `page_number` / `heading_path` + `char_start..char_end`，引用即由这些列拼成。
-- 新版本入库成功后，旧版本 chunks `is_active=false`（检索只查 active），实现"文档版本变化"而不丢历史引用。
+- 新版本入库成功后，**在同一事务内**删除该文档其它版本的分块，旧版本记录标记 `superseded`（版本行与原文件保留，可追溯）。检索同时要求 `is_active` 和 `documents.status='active'`。阶段 2 选择硬删除旧分块，避免向量索引膨胀，也避免误检索到旧内容；历史回答的引用位置信息由调用方（阶段 3 的 `agent_runs.citations`）以快照形式保存。
 - `embedding` 为 NOT NULL：只有 Embedding 成功的分块才写入，避免半索引状态。
 
 ### 工单与审批
@@ -70,6 +70,12 @@ LangGraph 自身的 checkpoint 表由 `langgraph-checkpoint-postgres` 的 `setup
 | `eval_runs` | name, dataset_name, dataset_sha256, retriever(basic/hybrid…), llm_provider, git_commit, config, metrics(JSONB), status, started_at, finished_at |
 | `eval_case_results` | eval_run_id, case_id, **label_source(human/synthetic)**, agent_run_id, recall_at_5, task_completed, grounded, tool_success_rate, latency_ms, total_tokens, details；`uq(eval_run_id, case_id)` |
 | `audit_logs` | actor_id, action, resource_type, resource_id, request_id, details；`ix(actor_id, created_at)`、`ix(resource_type, resource_id)` |
+
+## 迁移列表
+| 版本 | 文件 | 内容 |
+|---|---|---|
+| `0001` | `20261102_0001_initial_schema.py` | 扩展 vector + 16 张表、HNSW、GIN、约束 |
+| `0002` | `20261102_0002_rag_indexes_and_superseded_version_.py` | `chunks` 新增 `ix_chunks_document_version_id`、`ix_chunks_document_id`；`document_versions.index_status` CHECK 加入 `superseded`（可降级） |
 
 ## 迁移操作
 

@@ -1,5 +1,22 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { ApiError, api, type Readiness, type User, type Version } from "./api";
+import Evals from "./pages/Evals";
+import Knowledge from "./pages/Knowledge";
+import QA from "./pages/QA";
+import SearchDebug from "./pages/SearchDebug";
+
+const TABS = [
+  ["overview", "概览"],
+  ["knowledge", "知识库"],
+  ["search", "检索调试"],
+  ["qa", "问答"],
+  ["evals", "评测"],
+] as const;
+type Tab = (typeof TABS)[number][0];
+const tabFromHash = (): Tab => {
+  const h = window.location.hash.replace("#", "");
+  return (TABS.some(([k]) => k === h) ? h : "overview") as Tab;
+};
 
 const TOKEN_KEY = "opspilot.token";
 
@@ -20,6 +37,8 @@ export default function App() {
   const [version, setVersion] = useState<Version | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>(tabFromHash);
   const [email, setEmail] = useState("alice@opspilot.local");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
@@ -37,8 +56,18 @@ export default function App() {
 
   useEffect(() => {
     void refresh();
-    const token = sessionStorage.getItem(TOKEN_KEY);
-    if (token) api.me(token).then(setUser).catch(() => sessionStorage.removeItem(TOKEN_KEY));
+    const saved = sessionStorage.getItem(TOKEN_KEY);
+    if (saved)
+      api
+        .me(saved)
+        .then((u) => {
+          setUser(u);
+          setToken(saved);
+        })
+        .catch(() => sessionStorage.removeItem(TOKEN_KEY));
+    const onHash = () => setTab(tabFromHash());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
   }, [refresh]);
 
   async function onLogin(e: FormEvent) {
@@ -48,6 +77,7 @@ export default function App() {
       const res = await api.login(email, password);
       sessionStorage.setItem(TOKEN_KEY, res.access_token);
       setUser(await api.me(res.access_token));
+      setToken(res.access_token);
       setPassword("");
     } catch (err) {
       setAuthError(err instanceof ApiError ? err.message : String(err));
@@ -57,12 +87,13 @@ export default function App() {
   function logout() {
     sessionStorage.removeItem(TOKEN_KEY);
     setUser(null);
+    setToken(null);
   }
 
   return (
     <div className="min-h-screen text-slate-800">
       <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <h1 className="text-lg font-semibold">
             OpsPilot AI <span className="text-sm font-normal text-slate-500">智能技术支持平台</span>
           </h1>
@@ -72,9 +103,42 @@ export default function App() {
             </span>
           )}
         </div>
+        <nav className="mx-auto flex max-w-7xl gap-1 px-6" aria-label="主导航">
+          {TABS.map(([key, label]) => (
+            <a
+              key={key}
+              href={`#${key}`}
+              aria-current={tab === key ? "page" : undefined}
+              className={`border-b-2 px-3 py-2 text-sm ${
+                tab === key ? "border-indigo-600 font-medium text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              {label}
+            </a>
+          ))}
+          {user && <span className="ml-auto self-center text-xs text-slate-500">{user.display_name}</span>}
+        </nav>
       </header>
 
-      <main className="mx-auto grid max-w-5xl gap-6 px-6 py-8 md:grid-cols-2">
+      {tab !== "overview" && (
+        <main className="mx-auto max-w-7xl px-6 py-8">
+          {!token ? (
+            <p className="rounded-xl border bg-white p-6 text-sm text-slate-600">
+              请先在 <a href="#overview" className="text-indigo-600 underline">概览</a> 页登录。
+            </p>
+          ) : tab === "knowledge" ? (
+            <Knowledge token={token} />
+          ) : tab === "search" ? (
+            <SearchDebug token={token} embeddingProvider={version?.embedding_provider} />
+          ) : tab === "qa" ? (
+            <QA token={token} />
+          ) : (
+            <Evals token={token} />
+          )}
+        </main>
+      )}
+
+      <main hidden={tab !== "overview"} className="mx-auto grid max-w-7xl gap-6 px-6 py-8 md:grid-cols-2">
         <section className="rounded-xl border bg-white p-5 shadow-sm" aria-label="system-status">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold">系统状态</h2>

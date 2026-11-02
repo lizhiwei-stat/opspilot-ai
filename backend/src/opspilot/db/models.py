@@ -112,7 +112,8 @@ class DocumentVersion(Base):
     __table_args__ = (
         UniqueConstraint("document_id", "version", name="uq_document_versions_doc_version"),
         CheckConstraint(
-            "index_status IN ('pending','indexing','indexed','failed')", name="index_status_valid"
+            "index_status IN ('pending','indexing','indexed','failed','superseded')",
+            name="index_status_valid",
         ),
     )
 
@@ -139,6 +140,8 @@ class Chunk(Base):
     __table_args__ = (
         UniqueConstraint("document_version_id", "chunk_index", name="uq_chunks_version_index"),
         Index("ix_chunks_kb_active", "kb_id", "is_active"),
+        Index("ix_chunks_document_version_id", "document_version_id"),
+        Index("ix_chunks_document_id", "document_id"),
         Index("ix_chunks_tsv", "tsv", postgresql_using="gin"),
         Index(
             "ix_chunks_embedding_hnsw",

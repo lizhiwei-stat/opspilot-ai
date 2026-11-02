@@ -1,7 +1,7 @@
 # Common tasks. All Python commands run through uv; mock LLM mode by default.
 COMPOSE = docker compose --env-file .env -f infra/docker-compose.yml
 
-.PHONY: install migrate seed dev-backend dev-frontend test test-unit lint fmt fe-build fe-test up down seed-docker ps e2e check
+.PHONY: corpus corpus-docker eval eval-docker notebook e2e-rag install migrate seed dev-backend dev-frontend test test-unit lint fmt fe-build fe-test up down seed-docker ps e2e check
 
 install:
 	uv sync
@@ -57,3 +57,27 @@ e2e:
 	set -a; . ./.env; set +a; OPSPILOT_E2E_PASSWORD="$$OPSPILOT_SEED_ADMIN_PASSWORD" \
 	  uv run --no-project --with playwright==1.64.1 python frontend/e2e/login_e2e.py \
 	  --url http://localhost:$${OPSPILOT_FRONTEND_PORT:-5173} --email admin@opspilot.local --expect-role admin
+
+# ---- Stage 2 (RAG) -------------------------------------------------------------------
+# Ingest the synthetic corpus (idempotent; content-hash dedup) — host venv or container.
+corpus:
+	uv run python scripts/load_demo_corpus.py
+
+corpus-docker:
+	$(COMPOSE) exec backend python scripts/load_demo_corpus.py
+
+# 4-mode retrieval eval, mock embedding (free). Writes evals/results/*.json|md + eval_runs rows.
+eval:
+	uv run python evals/run_retrieval_eval.py
+
+eval-docker:
+	$(COMPOSE) exec -e OPSPILOT_GIT_COMMIT=$$(git rev-parse HEAD) backend python evals/run_retrieval_eval.py
+
+notebook:
+	uv run python scripts/build_notebook.py
+	uv run --group notebook jupyter nbconvert --to notebook --execute --inplace notebooks/rag_walkthrough.ipynb
+
+e2e-rag:
+	set -a; . ./.env; set +a; OPSPILOT_E2E_PASSWORD="$$OPSPILOT_SEED_USER_PASSWORD" \
+	  uv run --no-project --with playwright==1.64.1 python frontend/e2e/rag_e2e.py \
+	  --url http://localhost:$${OPSPILOT_FRONTEND_PORT:-5173} --email alice@opspilot.local

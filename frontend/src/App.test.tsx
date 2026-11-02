@@ -21,19 +21,28 @@ describe("App", () => {
           503,
         );
       return respond({
-        name: "OpsPilot AI", version: "0.1.0", stage: 1, env: "test", llm_provider: "mock",
+        name: "OpsPilot AI", version: "0.1.0", stage: 2, env: "test", llm_provider: "mock",
         llm_model: "mock-llm-v1", embedding_provider: "mock", embedding_model: "m", embedding_dim: 1024,
       });
     });
     render(<App />);
     await waitFor(() => expect(screen.getByText("未就绪")).toBeTruthy());
     expect(screen.getByText("失败")).toBeTruthy();
-    expect(screen.getByText(/Stage 1/)).toBeTruthy();
+    expect(screen.getByText(/Stage 2/)).toBeTruthy();
   });
 
   it("shows a network error when the backend is unreachable", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
     render(<App />);
     await waitFor(() => expect(screen.getByText(/network_error/)).toBeTruthy());
+  });
+
+  it("protected tabs ask for login first", async () => {
+    window.location.hash = "#qa";
+    vi.spyOn(globalThis, "fetch").mockImplementation(() => respond({ status: "ready", checks: [] }));
+    render(<App />);
+    expect(await screen.findByText(/请先在/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "问答" }).getAttribute("aria-current")).toBe("page");
+    window.location.hash = "";
   });
 });

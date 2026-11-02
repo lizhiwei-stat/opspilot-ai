@@ -3,18 +3,21 @@
 > Production-oriented AI Support & Ticket Resolution Platform
 > 面向软件企业技术支持 / 研发 / 客服团队的智能技术支持 Agent 平台：查文档、查日志、给出有出处的故障建议、生成待审工单，人工审批后才落库。
 
-**当前进度：第一阶段（基础设施）已完成，并在 WSL2 + Docker Compose 上实测（tag `stage-1.1`）** —— 详见 [docs/PROGRESS.md](docs/PROGRESS.md) 与 [阶段 1 报告](docs/reports/STAGE1_REPORT.md)。
-Agent、RAG、MCP、审批等核心能力尚未实现，按阶段推进，README 只写已经验证过的内容。
+**当前进度：第二阶段（企业知识库 RAG）已完成，在 WSL2 + Docker Compose 上实测（tag `stage-2`）** —— 详见 [docs/PROGRESS.md](docs/PROGRESS.md)、[阶段 2 设计](docs/STAGE2_DESIGN.md)、[阶段 2 报告](docs/reports/STAGE2_REPORT.md)、[检索评测报告](docs/reports/STAGE2_EVAL.md)。
+Agent、MCP、工单审批尚未实现（第三、四阶段）。README 只写已经验证过的内容。
 
-![阶段 1 状态页（WSL2 Docker Compose 实测，Windows Edge 截图）](docs/assets/stage1-wsl-compose.png)
+> ⚠️ 默认 **Mock 模式**：mock embedding 是特征哈希的字/词袋向量，**没有语义理解**；mock 回答器是**抽取式**的（摘录原文 + 引用），**没有调用大模型**。界面和接口都明确标注了这一点。真实 DashScope 路径已实现但需要显式开关，尚未运行。
+
+![检索调试页：四种检索模式并排对比（WSL2 实测，Windows Edge 截图）](docs/assets/stage2-search-debug.png)
 
 ## 文档
 - [PRD 需求说明](docs/PRD.md) · [架构说明](docs/ARCHITECTURE.md) · [数据库设计](docs/DATABASE.md) · [API 设计](docs/API.md)
-- [阶段进度](docs/PROGRESS.md) · [阶段 1 报告](docs/reports/STAGE1_REPORT.md)
+- [阶段进度](docs/PROGRESS.md) · [阶段 1 报告](docs/reports/STAGE1_REPORT.md) · [阶段 2 设计](docs/STAGE2_DESIGN.md) · [阶段 2 报告](docs/reports/STAGE2_REPORT.md) · [检索评测报告](docs/reports/STAGE2_EVAL.md)
+- [RAG 流程 Notebook（中文，含输出）](notebooks/rag_walkthrough.ipynb)
 
 ## 技术栈
-FastAPI · Pydantic v2 · SQLAlchemy 2 · Alembic · PostgreSQL + pgvector · PyJWT + Argon2 · structlog ·
-（后续阶段）LangGraph · LangChain · MCP Python SDK · Qwen（OpenAI 兼容）· React 19 + TypeScript + Vite + Tailwind v4。
+FastAPI · Pydantic v2 · SQLAlchemy 2 · Alembic · PostgreSQL + pgvector（HNSW）+ 全文检索（GIN）· jieba · pypdf · LangChain text-splitters · PyJWT + Argon2 · structlog · React 19 + TypeScript + Vite + Tailwind v4 ·
+（后续阶段）LangGraph · MCP Python SDK · Qwen（OpenAI 兼容）。
 版本与选型依据见 [ARCHITECTURE.md §5](docs/ARCHITECTURE.md)。
 
 ## 快速开始（Windows + WSL2，从零开始）
@@ -39,6 +42,11 @@ docker compose --env-file .env -f infra/docker-compose.yml ps
 # 4) 演示账号（幂等，可重复执行）
 docker compose --env-file .env -f infra/docker-compose.yml exec backend python scripts/seed_demo.py
 
+# 4b) 阶段 2：导入合成语料（13 篇 MD/TXT/PDF，3 个知识库；幂等，重复执行显示 duplicate）
+docker compose --env-file .env -f infra/docker-compose.yml exec backend python scripts/load_demo_corpus.py
+#     四种检索模式评测（mock，免费）：结果写入 evals/results/ 和 eval_runs 表，前端「评测」页可查看
+uv run python evals/run_retrieval_eval.py
+
 # 5) 检查
 curl -s http://localhost:8000/health/ready     # 端口按 .env 的 OPSPILOT_BACKEND_PORT
 #    浏览器打开 http://localhost:5173 （Windows 浏览器可直接访问 WSL 的 localhost 端口）
@@ -48,6 +56,10 @@ uv sync --frozen
 OPSPILOT_REQUIRE_DB=1 uv run pytest -v
 uv run ruff check . && uv run ruff format --check .
 docker compose --env-file .env -f infra/docker-compose.yml exec frontend npm test
+docker compose --env-file .env -f infra/docker-compose.yml exec frontend npm run build
+
+# 7) Notebook（中文 RAG 流程演示，执行后保留输出）
+make notebook
 ```
 
 > 作者机器（Teddy 的 WSL2）上 8000/8010 已被其他项目占用，实际使用 `OPSPILOT_PG_PORT=5433`、`OPSPILOT_BACKEND_PORT=8020`、`OPSPILOT_FRONTEND_PORT=5173`，下文 `8000` 请按你的 `.env` 替换。
@@ -60,7 +72,7 @@ docker compose --env-file .env -f infra/docker-compose.yml exec frontend npm tes
 | 后端 API / Swagger | http://localhost:8000/docs | `OPSPILOT_BACKEND_PORT` |
 | PostgreSQL 17 + pgvector 0.8.7 | 127.0.0.1:5432（库 `opspilot`，测试库 `opspilot_test`） | `OPSPILOT_PG_PORT` |
 
-停止：`docker compose --env-file .env -f infra/docker-compose.yml down`（数据保存在卷 `opspilot_pgdata`；**加 `-v` 会删除数据**）。
+停止：`docker compose --env-file .env -f infra/docker-compose.yml down`（数据保存在卷 `opspilot_pgdata`，上传的原始文件在卷 `opspilot_uploads`；**加 `-v` 会删除数据**）。
 
 ### 不用 Docker 的本地进程方式
 ```bash
@@ -71,11 +83,18 @@ cd frontend && npm ci && npm run dev      # :5173，需要 Node 22
 ```
 
 ### 演示账号
-`admin@opspilot.local`（管理员）、`alice@opspilot.local`、`bob@opspilot.local`（普通用户）。密码是 `.env` 中的 `OPSPILOT_SEED_ADMIN_PASSWORD` / `OPSPILOT_SEED_USER_PASSWORD`（`.env.example` 里的默认值仅供本地演示）。alice 被授权读取 `order-platform` 知识库，bob 没有（阶段 2 的权限隔离演示用）。
+`admin@opspilot.local`（管理员）、`alice@opspilot.local`、`bob@opspilot.local`（普通用户）。密码是 `.env` 中的 `OPSPILOT_SEED_ADMIN_PASSWORD` / `OPSPILOT_SEED_USER_PASSWORD`（`.env.example` 里的默认值仅供本地演示）。权限矩阵（阶段 2 的 ACL 演示与评测都基于它）：
+
+| 知识库 | 可见性 | admin | alice | bob |
+|---|---|---|---|---|
+| `order-platform` 订单平台技术文档 | restricted | 读写 | 只读（授权） | ✗ |
+| `public-faq` 公共 FAQ | public | 读写 | 只读 | 只读 |
+| `hr-confidential` 人力资源保密文档 | restricted（无授权） | 读写 | ✗ | ✗ |
 
 ## Mock 模式与真实模型
 默认 `OPSPILOT_LLM_PROVIDER=mock`、`OPSPILOT_EMBEDDING_PROVIDER=mock`：离线、确定性、零费用，测试与 CI 都用它。
-切换 Qwen：把两项改为 `openai_compatible`，并在 `.env` 中自行填写 `OPSPILOT_LLM_API_KEY`（不要提交）。阶段 1 中没有任何代码路径会调用真实模型。
+切换 Qwen / DashScope：把两项改为 `openai_compatible`，在 `.env` 中自行填写 `OPSPILOT_LLM_API_KEY`（不要提交），**并且**设置 `OPSPILOT_ALLOW_PAID_API=true`——缺少这个显式开关时，配置加载会直接报错，防止误调用付费接口。
+切换 embedding 模型后，旧向量不会与新模型混用（按 `embedding_model` 过滤），需要对文档执行「重建索引」；真实 embedding 评测：`uv run python evals/run_retrieval_eval.py --embedding real --i-understand-this-costs-money`（会对全部语料重新向量化，产生费用；**阶段 2 未运行**）。
 
 ## 常用命令
 | 命令 | 作用 |
@@ -86,8 +105,25 @@ cd frontend && npm ci && npm run dev      # :5173，需要 Node 22
 | `make fe-build` / `make fe-test` | 前端构建 / Vitest |
 | `make check` | 以上全部 |
 | `make e2e` | 真实浏览器登录 E2E（Playwright + 无头 Chromium，需先启动整套服务，密码从 `.env` 读取） |
+| `make e2e-rag` | 真实浏览器 RAG E2E：知识库 → 分块查看 → 四模式检索 → 问答引用 → 评测页 |
+| `make corpus` / `make corpus-docker` | 导入合成语料（宿主 / 容器内） |
+| `make eval` | 四种检索模式评测（mock embedding） |
+| `make notebook` | 重新生成并执行 `notebooks/rag_walkthrough.ipynb` |
+
+WSL 内的 Chromium 缺系统库（`libasound2`，需要 sudo），所以作者机器上的 E2E 用 Windows 的无头 Edge 跑：`powershell -File scripts\e2e_windows.ps1 -Shots <截图目录>`。
 
 集成测试使用 `OPSPILOT_TEST_DATABASE_URL`（默认 `opspilot_test` 库），每次会 `downgrade base → upgrade head`，**请勿指向有数据的库**。
+
+## 已实现（阶段 2：企业知识库 RAG）
+- 上传 PDF / Markdown / TXT：白名单、大小上限、魔数与扩展名一致性、二进制伪装检测、UTF-8/GB18030 解码；解析错误带错误码与中文说明
+- PDF 逐页解析（页码进入引用）、清洗（逐字空格折叠、视觉换行合并）；Markdown 标题感知分块（`heading_path`）+ LangChain `RecursiveCharacterTextSplitter`（中文标点优先），偏移量精确
+- 内容 SHA-256 去重；同名上传 = 新版本，旧版本 `superseded`、旧分块在同一事务内替换；失败版本不影响旧版本服务；重建索引 / 删除
+- 检索统一接口：向量（pgvector HNSW）、关键词（jieba 预分词 + PG 全文检索，错误码归一化）、混合 RRF（k=60）、混合 + 重排（可插拔 Reranker），返回每种方法的分数与排名、各阶段耗时
+- **ACL 在 SQL WHERE 中、排序之前生效**；不同 embedding 模型的向量不混算
+- 带引用的问答：引用真实 chunk id / 文档 / 页码；证据不足时固定回答「证据不足」；检索内容视为不可信（注入检测、剔除、`<untrusted_document>` 隔离、引用校验）
+- 评测：55 条中文问题（6 类，合成数据，标注来源如实说明），Recall@5 / MRR@10 / nDCG@10 / P50 / P95 / 失败率 / ACL 泄露 / 拒答率，JSON + MD + 数据库
+- 前端：知识库管理（上传、状态、版本、删除、重建）、分块查看器、检索调试（四模式并排）、问答面板（引用 + mock 标注）、评测结果页
+- 中文 Notebook：解析 → 分块 → 分词 → 向量化 → 入库 → 各检索器 → 手算 RRF → 重排 → 回答 → 指标
 
 ## 已实现（阶段 1）
 - FastAPI 应用工厂、pydantic-settings 配置（带安全校验）、JSON 结构化日志 + request_id + 敏感字段打码、统一错误格式

@@ -107,6 +107,7 @@ sequenceDiagram
 | Service | `services/` | 业务规则、事务边界、编排 | 调 Repository、Provider |
 | Repository | `repositories/` | SQLAlchemy 查询，无业务规则 | 只依赖 `db/` |
 | Domain/DB | `db/models.py`, `db/session.py` | ORM 模型、引擎、会话 | — |
+| RAG 纯函数 | `rag/` | 解析、清洗、分块、分词、RRF、重排、注入清洗（阶段 2） | 不依赖 Web/DB，可单测 |
 | Provider | `llm/` | LLM/Embedding 抽象与实现 | 不依赖 Web/DB |
 | Core | `core/` | 配置、日志、错误、安全 | 被所有层使用 |
 
@@ -127,6 +128,12 @@ sequenceDiagram
 | ADR-09 | structlog JSON 日志 + 纯 ASGI 中间件注入 `request_id`，敏感字段自动打码 | 日志可被机器解析，可与 Agent 轨迹关联 |
 | ADR-10 | 统一错误结构 `{"error":{code,message,request_id,details}}` | 前端与调用方只需处理一种格式 |
 | ADR-11 | 审批状态在**服务端**由数据库约束 + 事务校验（见 §2） | 不依赖提示词约束副作用 |
+| ADR-12 | 中文分词用 **jieba**（搜索模式 + 领域词典）在应用层完成，错误码等标识符整体归一化 | 无需 PG 扩展；写入和查询共用同一函数保证对称（详见 STAGE2_DESIGN §4） |
+| ADR-13 | 关键词通道用 PG FTS `ts_rank_cd`，**不是** BM25 | ACL 与事务一致性优先；IDF 缺失由重排器补上；可替换 ParadeDB pg_search（§5） |
+| ADR-14 | 融合用 **RRF, k=60** | 只用排名，免去余弦和 ts_rank 两种量纲的归一化（§6） |
+| ADR-15 | 新版本在**单一事务**内替换旧分块；失败版本只记录状态，不动旧索引 | 检索永远看到完整的某个版本（§10） |
+| ADR-16 | 向量检索按 `embedding_model` 过滤 | 换模型时绝不混算不同向量空间；未重建的文档只在关键词通道可见（§8） |
+| ADR-17 | 检索文本视为不可信：检测 → 剔除 → 隔离标签 → 引用校验 | 防提示注入；不把检测当成唯一防线（§11） |
 
 ## 5. 版本与选型依据（2026-11-02 在 PyPI / npm / Docker Hub 核对）
 
@@ -153,17 +160,48 @@ sequenceDiagram
 | Vitest / jsdom / Testing Library | 5.0.5 / 30.1.3 / 16.3.3 | |
 | PostgreSQL 镜像 | `pgvector/pgvector:0.8.7-pg17-trixie` | Docker Compose 与 CI 使用 |
 
-**后续阶段计划使用**（已核对当前版本，阶段 3/4 安装时会重新核对官方文档）：`langgraph 1.2.x`、`langchain-core 1.7.x`、`langchain-openai 1.7.x`、`langgraph-checkpoint-postgres`、`mcp 2.3.x`（MCP Python SDK）。
+**阶段 2 新增**（`uv.lock` 锁定）：
+
+| 组件 | 版本 | 说明 |
+|---|---|---|
+| jieba | 0.42.1（精确锁定） | 中文分词；已多年未发版，但算法与词典稳定，纯 Python 无编译依赖；在 Python 3.11 下有 `SyntaxWarning`（无害） |
+| pypdf | 6.21.x | PDF 逐页抽取，纯 Python |
+| langchain-text-splitters | 1.1.3（带入 langchain-core 1.7.3） | 只用 `RecursiveCharacterTextSplitter`，不引入 LangChain 运行时 |
+| python-multipart | 0.0.33 | FastAPI 文件上传 |
+| fpdf2（dev） | 2.9.0 | 只用于生成合成 PDF 语料和测试 PDF |
+| nbconvert / nbclient / ipykernel（notebook 组） | 7.17 / 0.11 / 7.4 | 执行 Notebook |
+| Playwright（`uv run --with`，不进锁文件） | 1.64.1 | 浏览器 E2E |
+
+**后续阶段计划使用**（已核对当前版本，阶段 3/4 安装时会重新核对官方文档）：`langgraph 1.2.x`、`langchain-openai 1.7.x`、`langgraph-checkpoint-postgres`、`mcp 2.3.x`（MCP Python SDK）。
 
 ## 6. 目录结构
 
 ```
-backend/src/opspilot/   core/ db/ repositories/ services/ llm/ api/
-backend/migrations/     Alembic（0001 初始全量 schema）
-frontend/               React + TS + Vite + Tailwind
+backend/src/opspilot/   core/ db/ repositories/ services/ llm/ api/ rag/
+  rag/                  parsers.py chunking.py tokenize.py fusion.py rerank.py sanitize.py data/userdict.txt
+  services/             ingestion.py retrieval.py qa.py（阶段 2）auth.py health.py
+  api/routes/           knowledge.py search.py evals.py（阶段 2）auth.py health.py system.py
+backend/migrations/     Alembic（0001 初始全量 schema，0002 RAG 索引 + superseded 状态）
+frontend/               React + TS + Vite + Tailwind；src/pages/{Knowledge,SearchDebug,QA,Evals}.tsx；e2e/
 tests/unit|integration  pytest（集成测试连真实 PostgreSQL + pgvector）
-evals/                  评测数据集与脚本（阶段 6）
-scripts/                seed_demo.py、local_pg.sh
+evals/                  corpus/（合成语料）datasets/（55 条问题）run_retrieval_eval.py results/
+notebooks/              rag_walkthrough.ipynb（中文，执行后保留输出）
+scripts/                seed_demo.py load_demo_corpus.py build_corpus_pdfs.py build_notebook.py local_pg.sh e2e_windows.ps1
 infra/                  docker-compose.yml、Dockerfile
-docs/                   PRD / ARCHITECTURE / DATABASE / API / PROGRESS / reports
+docs/                   PRD / ARCHITECTURE / DATABASE / API / PROGRESS / STAGE2_DESIGN / reports
 ```
+
+## 7. RAG 数据流（阶段 2）
+
+```
+POST /knowledge-bases/{id}/documents
+  └─ IngestionService.upload ─ validate_and_parse ─ chunk_document ─ tokenize ─ EmbeddingProvider.embed
+        └─ 单事务：INSERT chunks → DELETE 旧版本 chunks → 旧版本 superseded → 新版本 indexed
+POST /search
+  └─ RetrievalService.search ─┬─ KnowledgeRepository.vector_search  (pgvector, ACL+model 过滤在 WHERE)
+                              └─ KnowledgeRepository.keyword_search (tsvector@@tsquery, ACL 在 WHERE)
+                                 → rrf(k=60) → Reranker.score(Top-20) → Top-K + 每路分数/排名
+POST /qa
+  └─ QAService.answer ─ search(hybrid_rerank) ─ sanitize ─ 证据阈值 ─ mock 抽取 / LLM(<untrusted_document>) ─ 引用校验
+```
+详细设计、参数理由与验收标准见 [STAGE2_DESIGN.md](STAGE2_DESIGN.md)。

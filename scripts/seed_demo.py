@@ -25,6 +25,8 @@ DEMO_USERS = [
 DEMO_KBS = [
     ("order-platform", "订单平台技术文档", "订单服务 API、发布记录与故障手册", "restricted"),
     ("public-faq", "公共 FAQ", "面向全部员工的常见问题", "public"),
+    # Stage 2: restricted with NO grants -> only admins may read (ACL-leakage eval target).
+    ("hr-confidential", "人力资源保密文档", "仅管理员可见的内部政策", "restricted"),
 ]
 
 

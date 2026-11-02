@@ -41,3 +41,4 @@ class VersionOut(BaseModel):
     embedding_provider: str
     embedding_model: str
     embedding_dim: int
+    rag: dict[str, object]

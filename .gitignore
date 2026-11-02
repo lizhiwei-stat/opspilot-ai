@@ -10,3 +10,5 @@ frontend/dist/
 .pgdata/
 .pgserver-venv/
 *.tsbuildinfo
+data/uploads/
+evals/results/*.tmp

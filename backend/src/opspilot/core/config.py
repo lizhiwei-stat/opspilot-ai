@@ -36,6 +36,20 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr = SecretStr("")
     llm_timeout_s: float = 30.0
     llm_max_retries: int = 2
+    # Paid-API safety switch: openai_compatible providers refuse to build unless this is true.
+    allow_paid_api: bool = False
+    embedding_batch_size: int = Field(default=10, ge=1, le=64)
+
+    # ---- RAG (Stage 2) ----
+    upload_dir: str = "data/uploads"
+    max_upload_mb: float = Field(default=10.0, gt=0, le=100)
+    chunk_size: int = Field(default=500, ge=100, le=4000)
+    chunk_overlap: int = Field(default=80, ge=0, le=1000)
+    rrf_k: int = Field(default=60, ge=1)
+    retrieval_candidates: int = Field(default=50, ge=5, le=500)
+    rerank_candidates: int = Field(default=20, ge=2, le=200)
+    qa_min_evidence: float = Field(default=0.5, ge=0, le=1)
+    qa_max_context_chunks: int = Field(default=4, ge=1, le=20)
 
     @field_validator("embedding_dim")
     @classmethod
@@ -55,6 +69,13 @@ class Settings(BaseSettings):
         needs_key = "openai_compatible" in (self.llm_provider, self.embedding_provider)
         if needs_key and not self.llm_api_key.get_secret_value():
             raise ValueError("OPSPILOT_LLM_API_KEY is required for openai_compatible provider")
+        if needs_key and not self.allow_paid_api:
+            raise ValueError(
+                "openai_compatible providers call a paid API; set OPSPILOT_ALLOW_PAID_API=true "
+                "explicitly (requires the owner's authorization)"
+            )
+        if self.chunk_overlap >= self.chunk_size:
+            raise ValueError("chunk_overlap must be smaller than chunk_size")
         return self
 
 
