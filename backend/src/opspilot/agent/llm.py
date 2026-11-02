@@ -146,9 +146,12 @@ class MockAgentLLM:
         for t in hint.get("need_tools", []):
             if t == "search_knowledge":
                 add("search_knowledge", {"query": question, "top_k": 10})
+        incident = hint.get("intent") == "incident_ticket"
+        if incident:  # Stage 4: KB lookup through the Knowledge MCP server, per error code
+            for code in ent.get("error_codes", [])[:2]:
+                add("search_knowledge", {"query": f"{code} 错误 原因 处理", "top_k": 5})
         for code in ent.get("error_codes", []):
             add("analyze_error_code", {"code": code})
-        incident = hint.get("intent") == "incident_ticket"
         if (hint.get("intent") == "troubleshoot" or incident) and (
             rules.wants_logs(question) or ent.get("error_codes") or incident
         ):

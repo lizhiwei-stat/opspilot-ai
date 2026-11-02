@@ -19,7 +19,9 @@ _LOG_WORDS = re.compile(
     r"日志|log|trace|报错记录|错误记录|最近.{0,6}(错误|报错|异常)|告警记录", re.I
 )
 _TROUBLE = re.compile(r"故障|报错|异常|排查|500|5xx|超时|失败|挂了|不可用|告警|错误码")
-_TICKET_ACTION = re.compile(r"(创建|新建|提交|生成|开|提|建)(一个|一张|个|张)?(工单|ticket)", re.I)
+_TICKET_ACTION = re.compile(
+    r"(创建|新建|提交|生成|开|提|建)(一个|一张|个|张)?(待审核|待审批|待确认)?的?(工单|ticket)", re.I
+)
 _TICKET_QUERY = re.compile(r"(查|查看|看看|进展|状态).{0,6}(工单)|工单.{0,6}(进展|状态)")
 _CHITCHAT = re.compile(r"^(你好|您好|hi|hello|谢谢|多谢|早上好|晚上好)[!！。.\s]*$", re.I)
 _OUT_OF_SCOPE = re.compile(r"天气|股票|彩票|写(一首)?诗|讲个笑话|菜谱|足球")

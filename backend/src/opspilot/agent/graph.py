@@ -9,7 +9,6 @@
         code, service status) -> collect -> assess -> generate -> verify -> draft (server-built,
         Ticket MCP) -> approval (interrupt) -> apply_approval -> [update_ticket_status via
         Ticket MCP | revise -> approval ...] -> respond
-                   -> apply_approval -> respond
     any node --(exception | max steps | deadline)--> fail_safe
 
 Every node returns a `Command(update=..., goto=...)`, so routing is explicit and testable;
