@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+from pathlib import Path
 
 import pytest
 from fpdf import FPDF
@@ -19,7 +20,6 @@ from opspilot.rag.sanitize import is_suspicious, sanitize, wrap_untrusted
 from opspilot.rag.tokenize import query_tokens, to_search_text, tokenize
 
 MB = 2**20
-FONT = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
 
 
 # ---------------------------------------------------------------- tokenizer
@@ -89,24 +89,18 @@ def test_gb18030_fallback_and_bom() -> None:
     assert d2.pages[0].text == "# 标题" and d2.kind == "markdown"
 
 
-def _pdf(pages: list[str]) -> bytes:
-    pdf = FPDF()
-    pdf.add_font("cjk", "", FONT, collection_font_number=2)
-    for t in pages:
-        pdf.add_page()
-        pdf.set_font("cjk", size=11)
-        pdf.multi_cell(0, 7, t)
-    buf = io.BytesIO()
-    pdf.output(buf)
-    return buf.getvalue()
+# Committed corpus PDF (CJK font subset embedded) -> no system font needed to run tests.
+ROLLBACK_PDF = (
+    Path(__file__).resolve().parents[2]
+    / "evals/corpus/order-platform/deployment-rollback-guide.pdf"
+)
 
 
 def test_pdf_per_page() -> None:
-    d = validate_and_parse(
-        "x.pdf", _pdf(["第一页内容。", "第二页 ERR_PAY_TIMEOUT。"]), max_bytes=MB
-    )
-    assert [p.page_number for p in d.pages] == [1, 2]
-    assert "ERR_PAY_TIMEOUT" in d.pages[1].text
+    d = validate_and_parse("x.pdf", ROLLBACK_PDF.read_bytes(), max_bytes=MB)
+    assert [p.page_number for p in d.pages] == [1, 2, 3]
+    assert "kubectl rollout undo deployment/order-service" in d.pages[1].text  # wrap re-joined
+    assert d.pages[0].text.startswith("部署与回滚指南 - 发布流程\n")  # heading line kept separate
 
 
 def test_pdf_without_text() -> None:
@@ -138,10 +132,14 @@ def test_chunk_offsets_exact_and_headings() -> None:
 
 
 def test_chunk_pdf_page_relative_offsets() -> None:
-    d = validate_and_parse("x.pdf", _pdf(["甲" * 50, "乙页内容。"]), max_bytes=MB)
+    d = validate_and_parse("x.pdf", ROLLBACK_PDF.read_bytes(), max_bytes=MB)
     chunks = chunk_document(d, chunk_size=500, overlap=50)
-    assert [c.page_number for c in chunks] == [1, 2]
-    assert chunks[1].char_start == 0
+    assert [c.page_number for c in chunks] == [1, 2, 3]
+    for c in chunks:
+        assert (
+            c.char_start == 0
+            and d.pages[c.page_number - 1].text[c.char_start : c.char_end] == c.content
+        )
 
 
 # ---------------------------------------------------------------- sanitize
