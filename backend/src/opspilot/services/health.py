@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import asdict, dataclass
 
 from sqlalchemy import Engine, text
@@ -30,10 +32,20 @@ def _timed(name: str, fn: Callable[[], str]) -> CheckResult:
 
 
 class HealthService:
-    def __init__(self, engine: Engine, llm: LLMProvider, embedding: EmbeddingProvider) -> None:
+    def __init__(
+        self,
+        engine: Engine,
+        llm: LLMProvider,
+        embedding: EmbeddingProvider,
+        *,
+        timeout_s: float = 3.0,
+    ) -> None:
         self.engine = engine
         self.llm = llm
         self.embedding = embedding
+        self.timeout_s = timeout_s
+        # Bounded pool: a hung DB probe can occupy at most 2 threads, never the event loop.
+        self._pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ready-probe")
 
     def _database(self) -> str:
         with self.engine.connect() as conn:
@@ -67,7 +79,7 @@ class HealthService:
             raise RuntimeError("embedding dim mismatch")
         return f"{self.embedding.name}/{self.embedding.model} dim={self.embedding.dim}"
 
-    def readiness(self) -> dict[str, object]:
+    def _run_checks(self) -> dict[str, object]:
         db = _timed("database", self._database)
         if db.ok:
             db_checks = [_timed("pgvector", self._pgvector), _timed("migrations", self._migrations)]
@@ -82,3 +94,21 @@ class HealthService:
             "status": "ready" if all(c.ok for c in checks) else "not_ready",
             "checks": [asdict(c) for c in checks],
         }
+
+    def readiness(self) -> dict[str, object]:
+        """Run all checks under one overall deadline (OPSPILOT_READY_TIMEOUT_S)."""
+        start = time.perf_counter()
+        future = self._pool.submit(self._run_checks)
+        try:
+            return future.result(timeout=self.timeout_s)
+        except FutureTimeout:
+            elapsed = round((time.perf_counter() - start) * 1000, 2)
+            detail = f"timeout: readiness checks exceeded {self.timeout_s}s"
+            return {
+                "status": "not_ready",
+                "checks": [
+                    asdict(CheckResult(n, False, elapsed, detail))
+                    for n in ("database", "pgvector", "migrations", "llm", "embedding")
+                ],
+                "timed_out": True,
+            }

@@ -50,6 +50,8 @@ uv run ruff check . && uv run ruff format --check .
 docker compose --env-file .env -f infra/docker-compose.yml exec frontend npm test
 ```
 
+> 作者机器（Teddy 的 WSL2）上 8000/8010 已被其他项目占用，实际使用 `OPSPILOT_PG_PORT=5433`、`OPSPILOT_BACKEND_PORT=8020`、`OPSPILOT_FRONTEND_PORT=5173`，下文 `8000` 请按你的 `.env` 替换。
+>
 > `--env-file .env` 不能省略：compose 文件位于 `infra/`，默认只会读取 `infra/.env` 来替换端口变量。
 
 | 服务 | 默认地址（全部只绑定 127.0.0.1） | 变量 |
@@ -83,6 +85,7 @@ cd frontend && npm ci && npm run dev      # :5173，需要 Node 22
 | `make lint` / `make fmt` | Ruff 检查 / 格式化 |
 | `make fe-build` / `make fe-test` | 前端构建 / Vitest |
 | `make check` | 以上全部 |
+| `make e2e` | 真实浏览器登录 E2E（Playwright + 无头 Chromium，需先启动整套服务，密码从 `.env` 读取） |
 
 集成测试使用 `OPSPILOT_TEST_DATABASE_URL`（默认 `opspilot_test` 库），每次会 `downgrade base → upgrade head`，**请勿指向有数据的库**。
 

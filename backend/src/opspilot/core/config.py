@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://opspilot:opspilot@localhost:5432/opspilot"
     db_pool_size: int = 5
     db_connect_timeout_s: int = 3
+    ready_timeout_s: float = Field(default=3.0, gt=0, le=30)
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
 
     jwt_secret: SecretStr = SecretStr("dev-only-insecure-secret-change-me-0123456789")

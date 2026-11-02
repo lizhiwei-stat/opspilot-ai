@@ -1,7 +1,7 @@
 # Common tasks. All Python commands run through uv; mock LLM mode by default.
 COMPOSE = docker compose --env-file .env -f infra/docker-compose.yml
 
-.PHONY: install migrate seed dev-backend dev-frontend test test-unit lint fmt fe-build fe-test up down seed-docker ps check
+.PHONY: install migrate seed dev-backend dev-frontend test test-unit lint fmt fe-build fe-test up down seed-docker ps e2e check
 
 install:
 	uv sync
@@ -50,3 +50,10 @@ seed-docker:
 
 ps:
 	$(COMPOSE) ps
+
+# Real-browser login test against the running stack (downloads Chromium into ~/.cache once).
+e2e:
+	uv run --no-project --with playwright==1.64.1 python -m playwright install chromium
+	set -a; . ./.env; set +a; OPSPILOT_E2E_PASSWORD="$$OPSPILOT_SEED_ADMIN_PASSWORD" \
+	  uv run --no-project --with playwright==1.64.1 python frontend/e2e/login_e2e.py \
+	  --url http://localhost:$${OPSPILOT_FRONTEND_PORT:-5173} --email admin@opspilot.local --expect-role admin

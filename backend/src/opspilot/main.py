@@ -31,7 +31,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     engine = build_engine(settings)
     app.state.engine = engine
     app.state.sessionmaker = sessionmaker(bind=engine, expire_on_commit=False)
-    app.state.health_service = HealthService(engine, app.state.llm, app.state.embedding)
+    app.state.health_service = HealthService(
+        engine, app.state.llm, app.state.embedding, timeout_s=settings.ready_timeout_s
+    )
 
     app.add_middleware(
         CORSMiddleware,
