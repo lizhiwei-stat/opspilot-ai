@@ -7,12 +7,14 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
+import structlog
 from pwdlib import PasswordHash
 
 from opspilot.core.config import Settings
 from opspilot.core.errors import AuthError
 
 _hasher = PasswordHash.recommended()
+_log = structlog.get_logger("opspilot.auth")
 
 
 def hash_password(raw: str) -> str:
@@ -51,6 +53,19 @@ def decode_access_token(settings: Settings, token: str) -> dict[str, Any]:
             options={"require": ["exp", "sub", "iss"]},
         )
     except jwt.ExpiredSignatureError as exc:
+        _log.info("auth_token_rejected", reason=type(exc).__name__)
         raise AuthError("Token expired") from exc
     except jwt.InvalidTokenError as exc:
+        # diagnostic only: the class name + unverified time claims vs server clock (no token)
+        try:
+            u = jwt.decode(token, options={"verify_signature": False})
+            times = {k: u.get(k) for k in ("iat", "nbf", "exp")}
+        except Exception:  # noqa: BLE001
+            times = {}
+        _log.info(
+            "auth_token_rejected",
+            reason=type(exc).__name__,
+            server_now=round(datetime.now(UTC).timestamp(), 3),
+            **times,
+        )
         raise AuthError("Invalid token") from exc
