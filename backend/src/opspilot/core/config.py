@@ -103,6 +103,7 @@ class Settings(BaseSettings):
     agent_tool_retries: int = Field(default=1, ge=0, le=5)  # read-only tools only
     agent_approval_ttl_hours: float = Field(default=24.0, gt=0, le=720)
     agent_checkpoint_schema: str = "langgraph"
+    agent_checkpoint_auto_setup: bool = True  # PostgresSaver.setup() on first agent use
     agent_fault_injection: bool = False  # eval/test only: lets scenarios inject tool faults
     model_ledger_path: str = "data/ledger/model_calls.jsonl"
     model_price_table: str = "configs/model_prices.json"

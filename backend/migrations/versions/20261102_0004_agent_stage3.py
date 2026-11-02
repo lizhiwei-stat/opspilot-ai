@@ -72,7 +72,12 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_tool_calls_idempotency_key"), table_name="tool_calls")
     op.drop_column("tool_calls", "idempotency_key")
     op.drop_column("tool_calls", "call_id")
-    op.execute("DELETE FROM agent_runs WHERE status IN ('refused','expired') OR turn > 1")
+    # data-preserving: map new statuses to old ones, make per-turn thread ids unique again
+    op.execute("UPDATE agent_runs SET status='completed' WHERE status='refused'")
+    op.execute("UPDATE agent_runs SET status='aborted' WHERE status='expired'")
+    op.execute(
+        "UPDATE agent_runs SET thread_id = left(thread_id, 56) || '#t' || turn WHERE turn > 1"
+    )
     op.drop_constraint(op.f("ck_agent_runs_status_valid"), "agent_runs", type_="check")
     op.create_check_constraint(op.f("ck_agent_runs_status_valid"), "agent_runs", _OLD)
     op.drop_constraint(op.f("uq_agent_runs_thread_turn"), "agent_runs", type_="unique")

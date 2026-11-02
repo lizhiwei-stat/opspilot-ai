@@ -181,6 +181,8 @@ def head_parts(head: str) -> list[str]:
 def fact_question(text: str) -> dict[str, object] | None:
     """Return {"type", "heads"} for specific-fact questions, else None (procedural/open
     questions such as 怎么/如何/为什么/该先检查哪里 are judged by retrieval + generation)."""
+    # follow-up pronouns ("它现在是什么优先级") are not part of the asked-for concept
+    text = re.sub(r"^(它|这个工单|那个工单|这个|那个|该工单|该)(现在|目前)?", "", text.strip())
     if re.search(r"怎么|如何|为什么|为何|怎样|步骤|哪里|原因", text):
         return None
     if ERROR_CODE.search(text):  # error-code questions are handled by analyze_error_code

@@ -27,6 +27,9 @@ def make_settings(**overrides: object) -> Settings:
         "embedding_provider": "mock",
         "llm_api_key": "",
         "database_url": TEST_DATABASE_URL,
+        # tests call checkpoint.setup() explicitly (CREATE INDEX CONCURRENTLY would wait on
+        # fixture sessions that are idle in transaction)
+        "agent_checkpoint_auto_setup": False,
     }
     base.update(overrides)
     return Settings(_env_file=None, **base)  # type: ignore[arg-type]

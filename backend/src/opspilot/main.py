@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import sessionmaker
 
 from opspilot import __version__
-from opspilot.api.routes import auth, evals, health, knowledge, search, system
+from opspilot.api.routes import agent, auth, evals, health, knowledge, search, system
 from opspilot.core.config import Settings, get_settings
 from opspilot.core.errors import register_error_handlers
 from opspilot.core.logging import configure_logging, get_logger
@@ -18,6 +21,26 @@ from opspilot.llm.factory import build_embedding_or_degraded, build_llm
 from opspilot.services.health import HealthService
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    s = app.state.settings
+    if s.agent_checkpoint_auto_setup:
+        # before serving: PostgresSaver.setup() uses CREATE INDEX CONCURRENTLY, which would
+        # wait on request transactions if it ran lazily inside a request
+        import anyio
+
+        from opspilot.agent.checkpoint import setup
+
+        try:
+            await anyio.to_thread.run_sync(setup, s)
+        except Exception as exc:  # DB down at boot: agent endpoints fail later, app still boots
+            get_logger().warning("checkpointer_setup_failed", error=type(exc).__name__)
+    yield
+    pool = getattr(app.state, "agent_pool", None)  # LangGraph checkpointer pool (lazy)
+    if pool is not None:
+        pool.close()
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level, settings.log_json)
@@ -25,6 +48,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         title="OpsPilot AI API",
         version=__version__,
         description="Production-oriented AI Support & Ticket Resolution Platform",
+        lifespan=_lifespan,
     )
     app.state.settings = settings
     register_secret(settings.llm_api_key.get_secret_value())
@@ -54,6 +78,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         knowledge.router,
         search.router,
         evals.router,
+        agent.router,
     ):
         app.include_router(r)
     get_logger().info(

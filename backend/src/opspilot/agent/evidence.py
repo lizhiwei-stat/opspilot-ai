@@ -117,8 +117,15 @@ def assess(
         head_info = []
         for h in heads:
             parts = head_parts(h)
-            in_corpus = presence(parts) if parts else True
-            sents = [s for e in kb for s in _sentences(e["text"]) if parts and _has_parts(s, parts)]
+            tool_ev = [e for e in evidence if e["source"] == "tool"]
+            in_tools = bool(parts) and any(_has_parts(e["text"], parts) for e in tool_ev)
+            in_corpus = in_tools or (presence(parts) if parts else True)
+            sents = [
+                s
+                for e in kb + tool_ev
+                for s in _sentences(e["text"])
+                if parts and _has_parts(s, parts)
+            ]
             head_info.append(
                 {"head": h, "parts": parts, "in_corpus": in_corpus, "sentences": len(sents)}
             )
@@ -148,7 +155,7 @@ def assess(
         if fq["type"] == "value":
             head_sents = [
                 (e["title"], s)
-                for e in kb
+                for e in kb + [e for e in evidence if e["source"] == "tool"]
                 for s in _sentences(e["text"])
                 for i in head_info
                 if i["parts"] and _has_parts(s, i["parts"])
