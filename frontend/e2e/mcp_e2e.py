@@ -69,11 +69,11 @@ def main() -> int:
             "create_ticket_draft",
         ):
             expect(tools).to_contain_text(t)
-        expect(page.get_by_label("approval")).to_contain_text("需要管理员审批")
+        expect(page.get_by_label("approval", exact=True)).to_contain_text("需要管理员审批")
         expect(page.get_by_role("button", name="批准")).to_have_count(0)
         checks["alice_incident_pipeline"] = "KB+logs+error code+status via MCP -> draft -> awaiting"
         shot(page, a.screenshots, "stage4_incident_pending_user.png")
-        run_prefix = page.get_by_label("approval").inner_text()
+        run_prefix = page.get_by_label("approval", exact=True).inner_text()
         m = re.search(r"run ([0-9a-f]{8})", run_prefix)
         rid = m.group(1) if m else ""
 
@@ -82,7 +82,7 @@ def main() -> int:
         queue = adm.get_by_label("approval-queue")
         expect(queue).to_contain_text(rid or "打开", timeout=20_000)
         adm.get_by_role("button", name=f"打开 {rid}" if rid else re.compile("打开")).first.click()
-        approval = adm.get_by_label("approval")
+        approval = adm.get_by_label("approval", exact=True)
         expect(approval).to_contain_text("第 1 版")
         expect(adm.get_by_label("草稿内容")).to_contain_text("ORD-5003")
         expect(adm.get_by_role("button", name="退回修改")).to_be_disabled()

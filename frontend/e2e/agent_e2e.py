@@ -107,12 +107,12 @@ def main() -> int:
         page.get_by_role("button", name="新会话").click()
         ask(page, "订单接口 500 了，帮我创建一个工单")
         expect(result).to_contain_text("等待审批", timeout=30_000)
-        expect(page.get_by_label("approval")).to_contain_text("需要管理员审批")
+        expect(page.get_by_label("approval", exact=True)).to_contain_text("需要管理员审批")
         checks["user_cannot_approve"] = True
 
         adm = login(browser, a.url, "admin@opspilot.local", apw)
         ask(adm, "库存同步延迟，帮我提一个工单")
-        expect(adm.get_by_label("approval")).to_be_visible(timeout=30_000)
+        expect(adm.get_by_label("approval", exact=True)).to_be_visible(timeout=30_000)
         shot(adm, a.screenshots, "stage3_agent_approval_pending.png")
         adm.get_by_role("button", name="批准").click()
         # Stage 4: approval runs the business op (Ticket MCP update_ticket_status)
