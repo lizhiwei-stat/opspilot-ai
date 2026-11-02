@@ -11,5 +11,6 @@ frontend/dist/
 .pgserver-venv/
 *.tsbuildinfo
 data/uploads/
+**/data/uploads/
 evals/results/*.tmp
 evals/results/latest_*.json
