@@ -17,6 +17,8 @@ EXPECTED_TABLES = {
     "documents",
     "document_versions",
     "chunks",
+    "chunk_embeddings",
+    "embedding_models",
     "tickets",
     "ticket_drafts",
     "approvals",

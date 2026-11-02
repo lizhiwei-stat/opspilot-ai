@@ -9,6 +9,8 @@ from typing import Any
 
 import structlog
 
+from opspilot.core.redact import redact
+
 _SECRET_KEYS = re.compile(r"(password|secret|token|api_key|authorization)", re.I)
 
 
@@ -16,6 +18,8 @@ def _redact(_: Any, __: str, event_dict: dict[str, Any]) -> dict[str, Any]:
     for key in list(event_dict):
         if _SECRET_KEYS.search(key):
             event_dict[key] = "***"
+        elif isinstance(event_dict[key], str):
+            event_dict[key] = redact(event_dict[key])
     return event_dict
 
 

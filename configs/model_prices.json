@@ -1,0 +1,13 @@
+{
+  "_doc": "CNY list prices (原价, no promotions/free quota assumed), region cn-beijing (华北2). Verified 2026-11-02 against official Alibaba Cloud Bailian pages; re-verify before any paid run. Unit: CNY per 1M tokens.",
+  "_sources": [
+    "https://help.aliyun.com/zh/model-studio/model-pricing",
+    "https://help.aliyun.com/zh/model-studio/text-embedding-v4",
+    "https://help.aliyun.com/zh/model-studio/embedding"
+  ],
+  "models": {
+    "text-embedding-v4": {"kind": "embedding", "input_per_m": 0.5, "output_per_m": 0.0, "verified": "2026-11-02"},
+    "qwen-plus": {"kind": "chat", "input_per_m": 0.8, "output_per_m": 2.0, "note": "0<input<=128K tier, non-thinking output; thinking output 8 CNY/M", "verified": "2026-11-02"},
+    "qwen-flash": {"kind": "chat", "input_per_m": 0.15, "output_per_m": 1.5, "note": "0<input<=128K tier", "verified": "2026-11-02"}
+  }
+}

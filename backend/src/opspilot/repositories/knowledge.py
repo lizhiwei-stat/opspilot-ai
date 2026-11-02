@@ -7,10 +7,22 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import Select, and_, delete, exists, func, or_, select, text, update
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import Select, and_, cast, delete, exists, func, literal, or_, select, text, update
 from sqlalchemy.orm import Session
 
-from opspilot.db.models import Chunk, Document, DocumentVersion, KbPermission, KnowledgeBase, User
+from opspilot.core.errors import AppError
+from opspilot.db.models import (
+    DYNAMIC_INDEX_PREFIX,
+    Chunk,
+    ChunkEmbedding,
+    Document,
+    DocumentVersion,
+    EmbeddingModel,
+    KbPermission,
+    KnowledgeBase,
+    User,
+)
 
 WRITE_PERMS = ("write", "admin")
 
@@ -26,6 +38,13 @@ def accessible_kb_ids(user: User) -> Select[tuple[uuid.UUID]]:
     return stmt.where(
         or_(KnowledgeBase.visibility == "public", KnowledgeBase.owner_id == user.id, granted)
     )
+
+
+class EmbeddingDimensionMismatch(AppError):
+    """A registered model name is being used with a different vector dimension."""
+
+    status_code = 409
+    code = "embedding_dimension_mismatch"
 
 
 @dataclass(frozen=True)
@@ -192,18 +211,103 @@ class KnowledgeRepository:
         )
 
     def count_stale_chunks(self, user: User, model: str) -> int:
+        """Readable active chunks that have NO vector for `model` (need reindex)."""
+        m = self.get_model(model)
+        has = (
+            exists().where(ChunkEmbedding.chunk_id == Chunk.id, ChunkEmbedding.model_id == m.id)
+            if m is not None
+            else literal(False)
+        )
         return int(
             self.s.scalar(
                 select(func.count())
                 .select_from(Chunk)
-                .join(DocumentVersion, DocumentVersion.id == Chunk.document_version_id)
-                .where(
-                    Chunk.kb_id.in_(accessible_kb_ids(user)),
-                    DocumentVersion.embedding_model != model,
-                )
+                .where(Chunk.is_active, Chunk.kb_id.in_(accessible_kb_ids(user)), ~has)
             )
             or 0
         )
+
+    # ---------------------------------------------------------------- embedding index
+    def get_model(self, name: str) -> EmbeddingModel | None:
+        return self.s.scalar(select(EmbeddingModel).where(EmbeddingModel.name == name))
+
+    def register_model(
+        self, *, name: str, provider: str, dim: int, revision: str | None, config: dict[str, Any]
+    ) -> EmbeddingModel:
+        """Get-or-create the registry row and its partial HNSW index. Dimension is immutable
+        per name: a mismatch is a hard, explicit error (never a silent mixed index)."""
+        m = self.get_model(name)
+        if m is not None:
+            if m.dim != dim:
+                raise EmbeddingDimensionMismatch(
+                    f"embedding model '{name}' is registered with dim={m.dim} but the provider "
+                    f"returns dim={dim}. Use a new model name (new isolated index) or run "
+                    f"`scripts/reindex_embeddings.py --recreate` for this model."
+                )
+            if revision and m.revision and m.revision != revision:
+                raise EmbeddingDimensionMismatch(
+                    f"embedding model '{name}' index was built from revision {m.revision[:12]}, "
+                    f"provider is {revision[:12]}; reindex with --recreate"
+                )
+            return m
+        m = EmbeddingModel(name=name, provider=provider, dim=dim, revision=revision, config=config)
+        self.s.add(m)
+        self.s.flush()
+        self.s.execute(
+            text(
+                f"CREATE INDEX IF NOT EXISTS {DYNAMIC_INDEX_PREFIX}{int(m.id)} ON chunk_embeddings "
+                f"USING hnsw ((embedding::vector({int(dim)})) vector_cosine_ops) "
+                f"WITH (m = 16, ef_construction = 64) WHERE model_id = {int(m.id)}"
+            )
+        )
+        return m
+
+    def drop_model_vectors(self, model: EmbeddingModel) -> int:
+        res = self.s.execute(delete(ChunkEmbedding).where(ChunkEmbedding.model_id == model.id))
+        return int(res.rowcount or 0)
+
+    def add_embeddings(
+        self,
+        model: EmbeddingModel,
+        rows: list[tuple[uuid.UUID, list[float], int | None]],
+    ) -> None:
+        for cid, vec, ntok in rows:
+            if len(vec) != model.dim:
+                raise EmbeddingDimensionMismatch(
+                    f"vector dim {len(vec)} != registered dim {model.dim} for '{model.name}'"
+                )
+            self.s.merge(
+                ChunkEmbedding(chunk_id=cid, model_id=model.id, embedding=vec, token_count=ntok)
+            )
+
+    def chunks_missing_model(self, model: EmbeddingModel) -> list[tuple[Chunk, Document]]:
+        has = exists().where(
+            ChunkEmbedding.chunk_id == Chunk.id, ChunkEmbedding.model_id == model.id
+        )
+        rows = self.s.execute(
+            select(Chunk, Document)
+            .join(Document, Document.id == Chunk.document_id)
+            .where(Chunk.is_active, Document.status == "active", ~has)
+            .order_by(Chunk.document_id, Chunk.chunk_index)
+        )
+        return [(r[0], r[1]) for r in rows]
+
+    def index_coverage(self, model_name: str) -> tuple[int, int]:
+        """(active chunks with a vector for model, all active chunks)."""
+        total = self.s.scalar(select(func.count()).select_from(Chunk).where(Chunk.is_active)) or 0
+        m = self.get_model(model_name)
+        if m is None:
+            return 0, int(total)
+        have = (
+            self.s.scalar(
+                select(func.count())
+                .select_from(ChunkEmbedding)
+                .join(Chunk, Chunk.id == ChunkEmbedding.chunk_id)
+                .where(ChunkEmbedding.model_id == m.id, Chunk.is_active)
+            )
+            or 0
+        )
+        return int(have), int(total)
 
     # ---------------------------------------------------------------- retrieval
     def _searchable(self, user: User, kb_ids: list[uuid.UUID] | None) -> list[Any]:
@@ -216,6 +320,17 @@ class KnowledgeRepository:
             conds.append(Chunk.kb_id.in_(kb_ids))
         return conds
 
+    _ITER_SUPPORT: dict[str, bool] = {}  # noqa: RUF012  (per-process cache, keyed by db url)
+
+    def supports_iterative_scan(self) -> bool:
+        """hnsw.iterative_scan exists since pgvector 0.8.0; older servers silently skip it."""
+        key = str(self.s.get_bind().url)
+        if key not in self._ITER_SUPPORT:
+            v = self.s.scalar(text("SELECT extversion FROM pg_extension WHERE extname='vector'"))
+            parts = tuple(int(x) for x in str(v or "0.0").split(".")[:2])
+            self._ITER_SUPPORT[key] = parts >= (0, 8)
+        return self._ITER_SUPPORT[key]
+
     def vector_search(
         self,
         user: User,
@@ -224,22 +339,43 @@ class KnowledgeRepository:
         model: str,
         limit: int,
         kb_ids: list[uuid.UUID] | None = None,
+        ef_search: int = 100,
+        iterative_scan: str = "relaxed_order",
     ) -> list[ChunkHit]:
-        # Larger ef_search so ACL/model filters applied during the HNSW scan still yield `limit`.
+        """Cosine kNN over THIS model's vectors only (model_id filter + its own partial HNSW
+        index), ACL filter in the same WHERE. iterative_scan (pgvector >= 0.8) lets HNSW keep
+        scanning when filters reject candidates, instead of returning < limit rows."""
+        m = self.get_model(model)
+        if m is None:
+            return []
+        if len(qvec) != m.dim:
+            raise EmbeddingDimensionMismatch(
+                f"query vector dim {len(qvec)} != index dim {m.dim} for '{model}'"
+            )
         self.s.execute(
             text("SELECT set_config('hnsw.ef_search', :v, true)"),
-            {"v": str(max(40, min(1000, limit * 4)))},
+            {"v": str(max(ef_search, min(1000, limit)))},
         )
-        dist = Chunk.embedding.cosine_distance(qvec)
+        if iterative_scan != "off" and self.supports_iterative_scan():
+            self.s.execute(
+                text("SELECT set_config('hnsw.iterative_scan', :v, true)"), {"v": iterative_scan}
+            )
+        vec_t = Vector(m.dim)
+        dist = cast(ChunkEmbedding.embedding, vec_t).cosine_distance(
+            cast(literal(qvec, vec_t), vec_t)
+        )
         stmt = (
             select(Chunk.id, dist.label("dist"))
+            .select_from(ChunkEmbedding)
+            .join(Chunk, Chunk.id == ChunkEmbedding.chunk_id)
             .join(Document, Document.id == Chunk.document_id)
-            .join(DocumentVersion, DocumentVersion.id == Chunk.document_version_id)
-            .where(*self._searchable(user, kb_ids), DocumentVersion.embedding_model == model)
+            .where(ChunkEmbedding.model_id == m.id, *self._searchable(user, kb_ids))
             .order_by(dist)
             .limit(limit)
         )
-        return [ChunkHit(r.id, 1.0 - float(r.dist)) for r in self.s.execute(stmt)]
+        hits = [ChunkHit(r.id, 1.0 - float(r.dist)) for r in self.s.execute(stmt)]
+        # relaxed_order may return slightly out-of-order rows: re-sort (pgvector docs).
+        return sorted(hits, key=lambda h: -h.score)
 
     def keyword_search(
         self, user: User, tokens: list[str], *, limit: int, kb_ids: list[uuid.UUID] | None = None

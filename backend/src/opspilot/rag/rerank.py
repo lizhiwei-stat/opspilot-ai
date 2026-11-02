@@ -1,6 +1,12 @@
 """Pluggable rerankers. A reranker scores (query, passage) PAIRS jointly, unlike an embedding
 model which encodes query and passage independently (bi-encoder). Stage 2 ships a CPU-only
-lexical reranker; a cross-encoder can implement the same Protocol later."""
+lexical reranker; Stage 2.5 adds a real CPU cross-encoder (opspilot.llm.local).
+
+Three DISTINCT implementations, always reported with their `kind`:
+  rule   LexicalOverlapReranker  hand-written IDF coverage formula, no model
+  mock   MockReranker            identity (keeps the fused order); for tests/plumbing only
+  model  CrossEncoderReranker    real neural cross-encoder (bge-reranker-base), CPU
+"""
 
 from __future__ import annotations
 
@@ -13,12 +19,14 @@ from opspilot.rag.tokenize import query_tokens, tokenize
 
 class Reranker(Protocol):
     name: str
+    kind: str  # rule | mock | model
 
     def score(self, query: str, passages: list[str]) -> list[float]: ...
 
 
 class NoopReranker:
     name = "none"
+    kind = "mock"
 
     def score(self, query: str, passages: list[str]) -> list[float]:
         return [0.0] * len(passages)
@@ -33,6 +41,7 @@ class LexicalOverlapReranker:
     """
 
     name = "lexical-overlap-v1"
+    kind = "rule"
 
     def score(self, query: str, passages: list[str]) -> list[float]:
         q = query_tokens(query)
@@ -59,3 +68,15 @@ def coverage(query: str, passage: str) -> float:
         return 0.0
     s = set(tokenize(passage))
     return sum(1 for t in q if t in s) / len(q)
+
+
+class MockReranker:
+    """Identity reranker: score decreases with input position, so order is unchanged.
+    Lets tests exercise the rerank code path without any model. NOT a quality signal."""
+
+    name = "mock-identity"
+    kind = "mock"
+
+    def score(self, query: str, passages: list[str]) -> list[float]:
+        n = len(passages)
+        return [round(1.0 - i / max(1, n), 6) for i in range(n)]

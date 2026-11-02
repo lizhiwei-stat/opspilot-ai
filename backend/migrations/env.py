@@ -8,10 +8,20 @@ from sqlalchemy import create_engine, pool
 from opspilot.core.config import get_settings
 from opspilot.db import models  # noqa: F401  (register tables on metadata)
 from opspilot.db.base import Base
+from opspilot.db.models import DYNAMIC_INDEX_PREFIX
 
 target_metadata = Base.metadata
 if context.config.config_file_name is not None:
     fileConfig(context.config.config_file_name, disable_existing_loggers=False)
+
+
+def include_object(obj, name, type_, reflected, compare_to):  # type: ignore[no-untyped-def]
+    """Ignore objects alembic does not own: per-model HNSW indexes (created by the reindex
+    path) and anything reflected outside our metadata (e.g. a future LangGraph checkpointer
+    schema)."""
+    if type_ == "index" and name and name.startswith(DYNAMIC_INDEX_PREFIX):
+        return False
+    return not (type_ == "table" and reflected and compare_to is None)
 
 
 def _url() -> str:
@@ -27,7 +37,11 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     engine = create_engine(_url(), poolclass=pool.NullPool)
     with engine.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            include_object=include_object,
+        )
         with context.begin_transaction():
             context.run_migrations()
 

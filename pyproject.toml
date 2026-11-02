@@ -38,6 +38,27 @@ notebook = [
     "nbconvert>=7.17,<8",
 ]
 
+# Optional: free local CPU embedding / cross-encoder reranker (Stage 2.5).
+#   uv sync --group local-embed      (torch comes from the PyTorch CPU wheel index)
+# Default install, Docker image and mock tests do NOT need this group.
+local-embed = [
+    "torch>=2.6,<3",
+    "sentence-transformers>=5.1,<6",
+    "transformers>=4.56,<5",
+]
+
+[tool.uv]
+# local-embed is opt-in; `uv sync` (default groups) stays torch-free.
+default-groups = ["dev"]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
 [build-system]
 requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
@@ -48,7 +69,10 @@ packages = ["backend/src/opspilot"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["backend/src"]
-markers = ["integration: requires a real PostgreSQL + pgvector (OPSPILOT_TEST_DATABASE_URL)"]
+markers = [
+  "integration: requires a real PostgreSQL + pgvector (OPSPILOT_TEST_DATABASE_URL)",
+  "local_model: needs the local-embed group + cached HF models (skipped otherwise)",
+]
 
 [tool.ruff]
 line-length = 100

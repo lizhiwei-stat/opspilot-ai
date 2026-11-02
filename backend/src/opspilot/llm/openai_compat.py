@@ -54,6 +54,7 @@ class OpenAICompatEmbedding:
             raise ValueError("api_key is required for openai_compatible provider")
         self.model = model
         self.dim = dim
+        self.last_usage: dict[str, int] | None = None
         self._client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout_s)
 
     def embed(self, texts: list[str]) -> list[list[float]]:
@@ -63,6 +64,11 @@ class OpenAICompatEmbedding:
             )
         except openai.OpenAIError as exc:
             raise LLMError(f"{type(exc).__name__}: embedding call failed") from exc
+        u = getattr(resp, "usage", None)
+        # real token usage reported by the API (consumed by llm.gateway for cost booking)
+        self.last_usage = (
+            {"prompt_tokens": u.prompt_tokens, "total_tokens": u.total_tokens} if u else None
+        )
         vectors = [d.embedding for d in sorted(resp.data, key=lambda d: d.index)]
         if any(len(v) != self.dim for v in vectors):
             raise LLMError("embedding dimension mismatch")

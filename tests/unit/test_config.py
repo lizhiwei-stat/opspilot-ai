@@ -25,9 +25,12 @@ def test_prod_rejects_dev_secret() -> None:
         make_settings(env="prod", jwt_secret="dev-only-insecure-secret-change-me-0123456789")
 
 
-def test_embedding_dim_locked_to_schema() -> None:
-    with pytest.raises(ValidationError, match="1024"):
-        make_settings(embedding_dim=768)
+def test_embedding_dim_no_longer_locked_but_bounded() -> None:
+    # Stage 2.5: vectors live in chunk_embeddings (dimension-less column, one partial HNSW
+    # index per model), so other dims are allowed; mismatch per model is checked at runtime.
+    assert make_settings(embedding_dim=512).embedding_dim == 512
+    with pytest.raises(ValidationError):
+        make_settings(embedding_dim=0)
 
 
 def test_prod_rejects_env_example_placeholder() -> None:

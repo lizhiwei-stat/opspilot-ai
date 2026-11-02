@@ -62,3 +62,17 @@ class EmbeddingProvider(Protocol):
     dim: int
 
     def embed(self, texts: list[str]) -> list[list[float]]: ...
+
+
+def embed_query(embedder: EmbeddingProvider, text: str) -> list[float]:
+    """Query-side embedding: providers with an asymmetric query encoding (bge instruction
+    prefix) expose embed_query(); others embed queries like passages."""
+    fn = getattr(embedder, "embed_query", None)
+    return fn(text) if fn else embedder.embed([text])[0]
+
+
+def embedder_metadata(embedder: EmbeddingProvider) -> dict[str, object]:
+    fn = getattr(embedder, "metadata", None)
+    if fn:
+        return dict(fn())
+    return {"provider": embedder.name, "model_id": embedder.model, "dim": embedder.dim}

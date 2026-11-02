@@ -15,7 +15,14 @@ from sqlalchemy.orm import Session
 
 from opspilot.core.config import Settings
 from opspilot.core.errors import ForbiddenError, NotFoundError
-from opspilot.db.models import Chunk, Document, DocumentVersion, KnowledgeBase, User
+from opspilot.db.models import (
+    Chunk,
+    ChunkEmbedding,
+    Document,
+    DocumentVersion,
+    KnowledgeBase,
+    User,
+)
 from opspilot.llm.base import ChatResult, LLMError, Usage
 from opspilot.llm.mock import MockEmbedding, MockLLM
 from opspilot.main import create_app
@@ -91,7 +98,13 @@ def test_pipeline_md_indexed_with_metadata(env: Env) -> None:
     assert {c.heading_path for c in chunks} >= {"订单服务排查手册 > 连接池耗尽"}
     for c in chunks:
         assert c.kb_id == env.kbs["order-platform"].id and c.search_text and c.tsv
-        assert len(c.embedding) == 1024
+        assert c.embedding is None  # legacy column, no longer written (Stage 2.5)
+        assert c.char_count == len(c.content)
+    vecs = env.s.scalars(
+        select(ChunkEmbedding).where(ChunkEmbedding.chunk_id.in_([c.id for c in chunks]))
+    ).all()
+    assert len(vecs) == len(chunks) and all(len(v.embedding) == 1024 for v in vecs)
+    assert all(v.token_count is None for v in vecs)  # mock has no tokenizer: NULL, not chars
     src = RUNBOOK.strip()
     assert all(src[c.char_start : c.char_end] == c.content for c in chunks)
 
@@ -247,7 +260,9 @@ def test_acl_filter_is_applied_before_ranking(corpus: Env) -> None:
 def test_vector_search_ignores_other_embedding_models(corpus: Env) -> None:
     other = MockEmbedding(model="other-model-v9")
     res = corpus.retr(other).search(corpus.users["admin"], "ORD-5003", mode="vector")
-    assert res.candidates == []  # stale-model vectors are never compared
+    # never compared against another model's vectors: explicit keyword-only degradation
+    assert res.degraded == "no_vectors_for_model" and res.effective_mode == "keyword"
+    assert all(c.scores["vector"] is None for c in res.candidates)
     kw = corpus.retr(other).search(corpus.users["admin"], "ORD-5003", mode="keyword")
     assert kw.candidates
 

@@ -12,8 +12,9 @@ from opspilot.core.config import Settings, get_settings
 from opspilot.core.errors import register_error_handlers
 from opspilot.core.logging import configure_logging, get_logger
 from opspilot.core.middleware import RequestContextMiddleware
+from opspilot.core.redact import register_secret
 from opspilot.db.session import build_engine
-from opspilot.llm.factory import build_embedding, build_llm
+from opspilot.llm.factory import build_embedding_or_degraded, build_llm
 from opspilot.services.health import HealthService
 
 
@@ -26,8 +27,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         description="Production-oriented AI Support & Ticket Resolution Platform",
     )
     app.state.settings = settings
+    register_secret(settings.llm_api_key.get_secret_value())
     app.state.llm = build_llm(settings)
-    app.state.embedding = build_embedding(settings)
+    app.state.embedding = build_embedding_or_degraded(settings)
     engine = build_engine(settings)
     app.state.engine = engine
     app.state.sessionmaker = sessionmaker(bind=engine, expire_on_commit=False)

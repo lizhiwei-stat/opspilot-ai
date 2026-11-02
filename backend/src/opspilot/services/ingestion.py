@@ -15,7 +15,7 @@ from opspilot.core.config import Settings
 from opspilot.core.errors import AppError, ForbiddenError, NotFoundError
 from opspilot.core.logging import get_logger
 from opspilot.db.models import Chunk, Document, DocumentVersion, KnowledgeBase, User
-from opspilot.llm.base import EmbeddingProvider, LLMError
+from opspilot.llm.base import EmbeddingProvider, LLMError, embedder_metadata
 from opspilot.rag.chunking import ChunkDraft, chunk_document
 from opspilot.rag.parsers import ParsedDocument, ParseError, safe_filename, validate_and_parse
 from opspilot.rag.tokenize import to_search_text
@@ -70,6 +70,20 @@ class IngestionService:
             tmp.replace(path)  # atomic on POSIX
         return str(path)
 
+    def _model_row(self):  # type: ignore[no-untyped-def]
+        meta = embedder_metadata(self.embedder)
+        return self.repo.register_model(
+            name=self.embedder.model,
+            provider=self.embedder.name,
+            dim=self.embedder.dim,
+            revision=str(meta.get("revision")) if meta.get("revision") else None,
+            config={k: v for k, v in meta.items() if k != "load_s"},
+        )
+
+    def _token_counts(self, texts: list[str]) -> list[int | None]:
+        fn = getattr(self.embedder, "count_tokens", None)
+        return list(fn(texts)) if fn else [None] * len(texts)
+
     def _build_chunks(
         self, parsed: ParsedDocument, title: str
     ) -> tuple[list[ChunkDraft], list[list[float]]]:
@@ -97,23 +111,35 @@ class IngestionService:
         drafts: list[ChunkDraft],
         vectors: list[list[float]],
     ) -> list[Chunk]:
-        return [
+        """Chunk rows + this model's vectors (chunk_embeddings). Real token counts come from the
+        embedding model's own tokenizer when it has one; chunks.char_count is characters."""
+        model = self._model_row()
+        texts = [embed_text(doc.title, d.heading_path, d.content) for d in drafts]
+        ntoks = self._token_counts(texts)
+        rows = [
             Chunk(
+                id=uuid.uuid4(),
                 kb_id=doc.kb_id,
                 document_id=doc.id,
                 document_version_id=version.id,
                 chunk_index=d.index,
                 content=d.content,
                 search_text=to_search_text(f"{d.heading_path or ''}\n{d.content}"),
-                embedding=v,
                 page_number=d.page_number,
                 heading_path=d.heading_path,
                 char_start=d.char_start,
                 char_end=d.char_end,
-                token_count=len(d.content),
+                char_count=len(d.content),
             )
-            for d, v in zip(drafts, vectors, strict=True)
+            for d in drafts
         ]
+        self.s.add_all(rows)
+        self.s.flush()
+        self.repo.add_embeddings(
+            model,
+            [(c.id, v, n) for c, v, n in zip(rows, vectors, ntoks, strict=True)],
+        )
+        return rows
 
     # ------------------------------------------------------------------ upload
     def upload(
@@ -170,7 +196,7 @@ class IngestionService:
             log.warning("ingest_failed", doc=name, code=code)
             return IngestResult("failed", doc, version, 0, str(exc))
         # ---- single transaction (committed by the request unit of work) ----
-        self.s.add_all(self._chunk_rows(doc, version, drafts, vectors))
+        self._chunk_rows(doc, version, drafts, vectors)
         removed = self.repo.replace_document_chunks(doc.id, version.id)
         self.repo.supersede_other_versions(doc.id, version.id)
         version.index_status, version.chunk_count = "indexed", len(drafts)
@@ -210,7 +236,8 @@ class IngestionService:
         except LLMError as exc:  # old chunks untouched: still consistent
             raise UnprocessableError(f"重新索引失败（原索引保留）：{exc}") from exc
         self.repo.delete_version_chunks(version.id)
-        self.s.add_all(self._chunk_rows(doc, version, drafts, vectors))
+        self.s.flush()
+        self._chunk_rows(doc, version, drafts, vectors)
         version.chunk_count, version.embedding_model = len(drafts), self.embedder.model
         version.index_status, version.error_message = "indexed", None
         self.s.flush()

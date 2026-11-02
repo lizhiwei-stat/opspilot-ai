@@ -16,13 +16,17 @@ from typing import Literal
 from sqlalchemy.orm import Session
 
 from opspilot.core.config import Settings
+from opspilot.core.logging import get_logger
 from opspilot.db.models import User
-from opspilot.llm.base import EmbeddingProvider
+from opspilot.llm.base import EmbeddingProvider, embed_query
+from opspilot.llm.factory import build_reranker
 from opspilot.rag.fusion import rrf
-from opspilot.rag.rerank import LexicalOverlapReranker, Reranker
+from opspilot.rag.rerank import Reranker
 from opspilot.rag.sanitize import is_suspicious
 from opspilot.rag.tokenize import query_tokens
 from opspilot.repositories.knowledge import KnowledgeRepository
+
+log = get_logger("opspilot.retrieval")
 
 Mode = Literal["vector", "keyword", "hybrid", "hybrid_rerank"]
 MODES: tuple[Mode, ...] = ("vector", "keyword", "hybrid", "hybrid_rerank")
@@ -64,6 +68,11 @@ class RetrievalResult:
     timings_ms: dict[str, float]
     embedding_model: str
     reranker: str | None
+    reranker_kind: str | None = None
+    # Set when the requested mode could not run as asked, e.g. "embedding_unavailable" or
+    # "no_vectors_for_model": vector part skipped, result is keyword-only (flagged in UI/API).
+    degraded: str | None = None
+    effective_mode: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         d = asdict(self)
@@ -83,7 +92,7 @@ class RetrievalService:
         self.repo = KnowledgeRepository(session)
         self.settings = settings
         self.embedder = embedder
-        self.reranker: Reranker = reranker or LexicalOverlapReranker()
+        self.reranker: Reranker = reranker or build_reranker(settings)
 
     def search(
         self,
@@ -99,12 +108,37 @@ class RetrievalService:
         tokens = query_tokens(query)
         n = max(self.settings.retrieval_candidates, top_k)
         vec_hits, kw_hits = [], []
+        degraded: str | None = None
+        requested = mode
         if mode != "keyword":
             s = time.perf_counter()
-            qvec = self.embedder.embed([query])[0]
-            vec_hits = self.repo.vector_search(
-                user, qvec, model=self.embedder.model, limit=n, kb_ids=kb_ids
-            )
+            have, total = self.repo.index_coverage(self.embedder.model)
+            try:
+                if total and not have:
+                    raise _NoVectors(self.embedder.model)
+                qvec = embed_query(self.embedder, query)
+                t["embed_ms"] = (time.perf_counter() - s) * 1000
+            except _NoVectors:
+                degraded = "no_vectors_for_model"
+            except Exception as exc:  # embedding model down / timeout / not installed
+                if not self.settings.embedding_fallback_keyword:
+                    raise
+                degraded = f"embedding_unavailable:{type(exc).__name__}"
+            if not degraded:
+                # DB errors are NOT degraded silently: they propagate (500), never hidden.
+                vec_hits = self.repo.vector_search(
+                    user,
+                    qvec,
+                    model=self.embedder.model,
+                    limit=n,
+                    kb_ids=kb_ids,
+                    ef_search=self.settings.hnsw_ef_search,
+                    iterative_scan=self.settings.hnsw_iterative_scan,
+                )
+            else:
+                log.warning("vector_search_degraded", reason=degraded, model=self.embedder.model)
+                # keyword-only fallback; rerank (if asked) still applies on keyword candidates
+                mode = "keyword" if mode in ("vector", "hybrid") else mode
             t["vector_ms"] = (time.perf_counter() - s) * 1000
         if mode != "vector":
             s = time.perf_counter()
@@ -115,7 +149,7 @@ class RetrievalService:
 
         if mode == "vector":
             ordered = [(h.chunk_id, h.score) for h in vec_hits]
-        elif mode == "keyword":
+        elif mode == "keyword" or (degraded and mode == "hybrid_rerank"):
             ordered = [(h.chunk_id, h.score) for h in kw_hits]
         else:
             s = time.perf_counter()
@@ -175,13 +209,20 @@ class RetrievalService:
         t["total_ms"] = (time.perf_counter() - t0) * 1000
         return RetrievalResult(
             query,
-            mode,
+            requested,
             tokens,
             cands,
             {k: round(v, 3) for k, v in t.items()},
             self.embedder.model,
             self.reranker.name if mode == "hybrid_rerank" else None,
+            getattr(self.reranker, "kind", None) if mode == "hybrid_rerank" else None,
+            degraded,
+            mode if degraded else requested,
         )
+
+
+class _NoVectors(Exception):
+    pass
 
 
 def _r(x: tuple[int, float] | None) -> float | None:
