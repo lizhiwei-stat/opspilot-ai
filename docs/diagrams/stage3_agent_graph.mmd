@@ -1,0 +1,53 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__(<p>__start__</p>)
+	guard_in(guard_in)
+	classify(classify)
+	plan(plan)
+	retrieve(retrieve)
+	assess(assess)
+	agent(agent)
+	collect(collect)
+	apply_approval(apply_approval)
+	generate(generate)
+	verify(verify)
+	respond(respond)
+	refuse(refuse)
+	fail_safe(fail_safe)
+	approval(approval)
+	tools(tools<hr/><small><em>__tools = search_knowledge, query_mock_logs, get_ticket, analyze_error_code, create_ticket_draft</em></small>)
+	__end__(<p>__end__</p>)
+	__start__ --> guard_in;
+	agent -.-> assess;
+	agent -.-> collect;
+	agent -.-> tools;
+	apply_approval -.-> respond;
+	approval -.-> apply_approval;
+	assess -.-> agent;
+	assess -.-> generate;
+	assess -.-> refuse;
+	assess -.-> respond;
+	classify -.-> plan;
+	collect -.-> approval;
+	collect -.-> assess;
+	collect -.-> refuse;
+	generate -.-> verify;
+	guard_in -.-> classify;
+	guard_in -.-> refuse;
+	plan -.-> agent;
+	plan -.-> refuse;
+	plan -.-> respond;
+	plan -.-> retrieve;
+	refuse -.-> __end__;
+	respond -.-> __end__;
+	retrieve -.-> assess;
+	tools --> collect;
+	verify -.-> refuse;
+	verify -.-> respond;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

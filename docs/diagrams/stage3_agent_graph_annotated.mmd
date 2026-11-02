@@ -1,0 +1,26 @@
+flowchart TD
+  S([START]) --> guard_in
+  guard_in -->|注入/越权/空问题| refuse
+  guard_in --> classify --> plan
+  plan -->|闲聊/元问题| respond
+  plan -->|超出范围| refuse
+  plan -->|需要知识库| retrieve --> assess
+  plan -->|需要工具| agent
+  assess -->|证据不足且可用工具| agent
+  assess -->|证据充分| generate
+  assess -->|无证据/矛盾/值槽为空| refuse
+  assess -->|需澄清| respond
+  agent -->|tool_calls 经服务端过滤| tools
+  agent -->|全部被拒/超限| collect
+  agent -->|不再调用工具| assess
+  tools --> collect
+  collect -->|create_ticket_draft| approval
+  collect --> assess
+  collect -->|工具全部失败| refuse
+  approval -->|"interrupt() 等待管理员"| apply_approval --> respond
+  generate --> verify
+  verify -->|引用/数字校验通过| respond
+  verify -->|校验失败| refuse
+  respond --> E([END])
+  refuse --> E
+  X{{任意节点: 异常 / max_steps / deadline}} -.-> fail_safe --> E
