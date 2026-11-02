@@ -69,7 +69,9 @@ Bi-encoder 分别编码问题和文档；cross-encoder 把（问题, 文档）�
 开发中发现 sentence-transformers 在 `activation_fn=None` 时会套用模型默认的 Sigmoid，而我们又做了一次 sigmoid，导致所有分数挤在 0.5–0.73（双 sigmoid）。修复后分数恢复区分度：""")
 code("""ce = CrossEncoderReranker(model_id=s.reranker_model, revision=s.reranker_revision, threads=s.local_threads)
 q = queries[0]
-t0 = time.perf_counter(); scores = ce.score(q, docs); dt = time.perf_counter() - t0
+t0 = time.perf_counter()
+scores = ce.score(q, docs)
+dt = time.perf_counter() - t0
 for d, sc in sorted(zip(docs, scores), key=lambda x: -x[1]):
     print(f"{sc:.4f}  double_sigmoid={1/(1+math.exp(-sc)):.4f}  {d[:24]}…")
 print(f"4 段耗时 {dt*1000:.0f} ms（CPU）")""")
@@ -85,7 +87,8 @@ md("""dev 上调到 1.000 的阈值，在冻结的 held-out 上正确拒答率�
 
 ## 6. pgvector iterative scan""")
 code("""for f in sorted(glob.glob(str(ROOT / "evals/results/*iterscan*.json"))):
-    d = json.load(open(f)); p = d["params"]
+    d = json.loads(Path(f).read_text(encoding="utf-8"))
+    p = d["params"]
     print(f"n={p['n']} 选择度={p['selectivity']} ef_search={p['ef_search']} pgvector={d['pgvector']}")
     for mode, r in d["settings"].items():
         print(f"  {mode:14s} 平均返回 {r['rows_returned_mean']:>5}  召回 {r['recall_vs_exact']:.3f}  P50 {r['latency_ms_p50']} ms")""")
