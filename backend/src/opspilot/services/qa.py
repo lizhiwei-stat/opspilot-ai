@@ -31,6 +31,7 @@ from opspilot.services.retrieval import Candidate, RetrievalService
 INSUFFICIENT = "证据不足：在你有权限访问的知识库中没有找到足以回答该问题的可靠依据。"
 MOCK_BANNER = "【Mock 抽取式回答 · 未调用大模型，以下内容为原文摘录】"
 _SENT = re.compile(r"[^。！？!?\n]+[。！？!?]?")
+QUOTE_SEP = " … "  # separates non-adjacent verbatim sentences inside one citation quote
 _ANCHOR = re.compile(r"[A-Za-z][A-Za-z+#]{2,}")
 # generic Latin words that are not "topic anchors"
 _ANCHOR_STOP = frozenset({"api", "http", "https", "the", "and", "for", "token", "sdk", "url"})
@@ -231,7 +232,7 @@ class QAService:
         return "mock-extractive" if self._mock else f"llm:{self.llm.model}"
 
     def _cite(self, idx: int, c: Candidate, text: str, ev: float, q: str) -> Citation:
-        quote = " ".join(_best_sentences(q, text)) or text[:160]
+        quote = QUOTE_SEP.join(_best_sentences(q, text)) or text[:160]
         return Citation(
             idx,
             c.chunk_id,

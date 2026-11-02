@@ -41,10 +41,12 @@ def norm(s: str) -> str:
     return _WS.sub("", s)
 
 
-def verify_quote(quote: str, source: str) -> bool:
-    """A citation quote must be a verbatim (whitespace-insensitive) substring of its chunk."""
-    q = norm(quote)
-    return bool(q) and q in norm(source)
+def verify_quote(quote: str, source: str, sep: str = " … ") -> bool:
+    """Every part of a citation quote must be a verbatim (whitespace-insensitive) substring
+    of the chunk it cites."""
+    src = norm(source)
+    parts = [norm(p) for p in quote.split(sep)]
+    return bool(parts) and all(p and p in src for p in parts)
 
 
 def check_answer(answer: str, trusted_evidence: list[str]) -> PolicyResult:
