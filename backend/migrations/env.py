@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from logging.config import fileConfig
+
 from alembic import context
 from sqlalchemy import create_engine, pool
 
@@ -8,6 +10,8 @@ from opspilot.db import models  # noqa: F401  (register tables on metadata)
 from opspilot.db.base import Base
 
 target_metadata = Base.metadata
+if context.config.config_file_name is not None:
+    fileConfig(context.config.config_file_name, disable_existing_loggers=False)
 
 
 def _url() -> str:
