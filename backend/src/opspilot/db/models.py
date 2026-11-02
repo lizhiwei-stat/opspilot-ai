@@ -264,14 +264,24 @@ class AgentRun(TimestampMixin, Base):
     __tablename__ = "agent_runs"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('running','awaiting_approval','completed','aborted','failed')",
+            "status IN ('running','awaiting_approval','completed','refused','aborted',"
+            "'failed','expired')",
             name="status_valid",
         ),
         Index("ix_agent_runs_user_created", "user_id", "created_at"),
+        # one row per TURN; a conversation (= LangGraph checkpoint thread) has many turns
+        UniqueConstraint("thread_id", "turn", name="uq_agent_runs_thread_turn"),
     )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
-    thread_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    thread_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    turn: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    is_mock: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    node_trace: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    evidence: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    assessment: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    tool_call_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cost_cny: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     input_text: Mapped[str] = mapped_column(Text, nullable=False)
     intent: Mapped[str | None] = mapped_column(String(64))
@@ -326,6 +336,7 @@ class ToolCall(Base):
             "status IN ('ok','error','timeout','denied','fallback')", name="status_valid"
         ),
         Index("ix_tool_calls_run_id", "run_id"),
+        Index("ix_tool_calls_idempotency_key", "idempotency_key"),
         Index("ix_tool_calls_tool_created", "tool_name", "created_at"),
     )
 
@@ -345,6 +356,8 @@ class ToolCall(Base):
     error: Mapped[str | None] = mapped_column(Text)
     duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     caller_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    call_id: Mapped[str | None] = mapped_column(String(64))  # model tool_call id
+    idempotency_key: Mapped[str | None] = mapped_column(String(40))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -377,6 +390,9 @@ class TicketDraft(TimestampMixin, Base):
     payload_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="pending_approval")
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    # (thread, tool, canonical args) hash: a replayed/duplicated tool call cannot create a
+    # second draft (Stage 3 resume safety)
+    idempotency_key: Mapped[str | None] = mapped_column(String(40), unique=True)
 
 
 class Approval(Base):

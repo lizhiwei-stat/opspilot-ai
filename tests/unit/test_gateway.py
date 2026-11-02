@@ -26,6 +26,7 @@ PRICES = PriceTable(
     {
         "fake-embed": {"input_per_m": 1_000_000.0},  # 1 CNY per token: easy arithmetic
         "fake-chat": {"input_per_m": 1_000_000.0, "output_per_m": 2_000_000.0},
+        "m-chat": {"input_per_m": 0.8, "output_per_m": 2.0},  # qwen-plus-like
     }
 )
 FAKE_KEY = "sk-fakefakefake0123456789abcdef"
@@ -68,6 +69,7 @@ def gw(tmp_path: Path, **kw: object) -> ModelGateway:
         "allow_paid_api": True,
         "paid_approval_id": "APPROVAL-TEST-1",
         "paid_budget_cny": 10.0,
+        "paid_max_calls": 100,
         "model_ledger_path": str(tmp_path / "ledger.jsonl"),
     }
     base.update(kw)
@@ -180,3 +182,110 @@ def test_redact_shapes_and_registered_values(monkeypatch: pytest.MonkeyPatch) ->
     out = redact(s)
     assert "abcdefghijklmnop1234" not in out and "sk-abcdefghijklmnop" not in out
     assert "plainvalue-without-shape-42" not in out and out.count("***REDACTED***") == 3
+
+
+# ----------------------------------------------------------- Stage 3 pre-request guards
+def _fn_ok(max_out: int):  # type: ignore[no-untyped-def]
+    return "ok", {"prompt_tokens": 10, "completion_tokens": max_out}
+
+
+def test_call_count_limit_is_checked_before_request(tmp_path: Path) -> None:
+    g = gw(tmp_path, paid_max_calls=2)
+    sent: list[int] = []
+
+    def fn(m: int):  # type: ignore[no-untyped-def]
+        sent.append(m)
+        return "ok", {"prompt_tokens": 1, "completion_tokens": 1}
+
+    for _ in range(2):
+        g.guarded_call(
+            provider="openai_compatible", model="m-chat", kind="chat", est_in=5, max_out=5, fn=fn
+        )
+    with pytest.raises(PaidCallRefused, match="call limit"):
+        g.guarded_call(
+            provider="openai_compatible", model="m-chat", kind="chat", est_in=5, max_out=5, fn=fn
+        )
+    assert len(sent) == 2  # third request never sent
+
+
+def test_default_max_calls_zero_refuses_everything(tmp_path: Path) -> None:
+    g = gw(tmp_path, paid_max_calls=0)
+    with pytest.raises(PaidCallRefused):
+        g.guarded_call(
+            provider="openai_compatible",
+            model="m-chat",
+            kind="chat",
+            est_in=1,
+            max_out=1,
+            fn=_fn_ok,
+        )
+
+
+def test_max_output_tokens_clamped_and_used_in_estimate(tmp_path: Path) -> None:
+    g = gw(tmp_path, paid_max_output_tokens=50)
+    seen: list[int] = []
+
+    def fn(m: int):  # type: ignore[no-untyped-def]
+        seen.append(m)
+        return "ok", {"prompt_tokens": 1, "completion_tokens": m}
+
+    g.guarded_call(
+        provider="openai_compatible", model="m-chat", kind="chat", est_in=1, max_out=4000, fn=fn
+    )
+    assert seen == [50]
+
+
+def test_estimate_exceeding_budget_blocks_before_request(tmp_path: Path) -> None:
+    g = gw(tmp_path, paid_budget_cny=0.000001, paid_max_output_tokens=8000)
+    called = []
+    with pytest.raises(BudgetExceeded):
+        g.guarded_call(
+            provider="openai_compatible",
+            model="m-chat",
+            kind="chat",
+            est_in=100000,
+            max_out=8000,
+            fn=lambda m: called.append(m) or ("x", None),
+        )
+    assert called == [] and g.reserved_cny == 0.0
+
+
+def test_concurrency_limit_refuses_when_no_slot(tmp_path: Path) -> None:
+    import threading
+
+    g = gw(tmp_path, paid_max_concurrency=1, paid_concurrency_wait_s=0.05)
+    gate, started = threading.Event(), threading.Event()
+
+    def slow(m: int):  # type: ignore[no-untyped-def]
+        started.set()
+        gate.wait(2)
+        return "ok", {"prompt_tokens": 1, "completion_tokens": 1}
+
+    t = threading.Thread(
+        target=lambda: g.guarded_call(
+            provider="openai_compatible", model="m-chat", kind="chat", est_in=1, max_out=1, fn=slow
+        )
+    )
+    t.start()
+    started.wait(2)
+    with pytest.raises(PaidCallRefused, match="concurrency"):
+        g.guarded_call(
+            provider="openai_compatible",
+            model="m-chat",
+            kind="chat",
+            est_in=1,
+            max_out=1,
+            fn=_fn_ok,
+        )
+    gate.set()
+    t.join()
+    assert g.reserved_cny == 0.0
+
+
+def test_inflight_reservations_count_against_budget(tmp_path: Path) -> None:
+    g = gw(tmp_path)
+    est = g._authorize("m-chat", 10, 10)  # one call in flight
+    g2_cap = g.cap
+    with pytest.raises(BudgetExceeded):
+        g._check_budget(g2_cap - est + 1e-9)
+    g._release(est)

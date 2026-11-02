@@ -21,6 +21,9 @@ def include_object(obj, name, type_, reflected, compare_to):  # type: ignore[no-
     schema)."""
     if type_ == "index" and name and name.startswith(DYNAMIC_INDEX_PREFIX):
         return False
+    # LangGraph checkpointer tables live in schema `langgraph`, owned by PostgresSaver.setup()
+    if getattr(obj, "schema", None) == "langgraph":
+        return False
     return not (type_ == "table" and reflected and compare_to is None)
 
 

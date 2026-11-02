@@ -82,6 +82,27 @@ class Settings(BaseSettings):
     # ---- paid model gateway (Stage 2.5): OFF by default, see llm/gateway.py ----
     paid_approval_id: str = ""  # per-run approval token, required for any paid call
     paid_budget_cny: float = Field(default=0.0, ge=0, le=100)  # hard cap per run
+    # Stage 3 pre-request guards (all checked BEFORE a paid request is sent)
+    paid_max_calls: int = Field(default=0, ge=0, le=100000)  # per run; 0 = refuse all paid calls
+    paid_max_output_tokens: int = Field(default=800, ge=1, le=8192)  # max_tokens is clamped
+    paid_max_concurrency: int = Field(default=2, ge=1, le=16)  # in-flight paid requests
+    paid_concurrency_wait_s: float = Field(default=5.0, ge=0, le=120)
+    # ---- Stage 3 agent ----
+    agent_llm_provider: Literal["mock", "qwen"] = "mock"
+    agent_llm_model: str = "qwen-plus"
+    agent_llm_temperature: float = Field(default=0.0, ge=0, le=2)
+    agent_llm_max_tokens: int = Field(default=600, ge=16, le=8192)
+    agent_llm_timeout_s: float = Field(default=30.0, ge=1, le=300)
+    agent_max_steps: int = Field(default=24, ge=4, le=200)
+    agent_max_tool_calls: int = Field(default=6, ge=0, le=50)
+    agent_max_react_rounds: int = Field(default=3, ge=0, le=20)
+    agent_max_llm_calls: int = Field(default=8, ge=1, le=100)
+    agent_recursion_limit: int = Field(default=40, ge=10, le=500)
+    agent_tool_timeout_s: float = Field(default=5.0, ge=0.05, le=120)
+    agent_tool_retries: int = Field(default=1, ge=0, le=5)  # read-only tools only
+    agent_approval_ttl_hours: float = Field(default=24.0, gt=0, le=720)
+    agent_checkpoint_schema: str = "langgraph"
+    agent_fault_injection: bool = False  # eval/test only: lets scenarios inject tool faults
     model_ledger_path: str = "data/ledger/model_calls.jsonl"
     model_price_table: str = "configs/model_prices.json"
 

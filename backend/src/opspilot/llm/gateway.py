@@ -18,6 +18,10 @@ Free providers (mock, local) pass straight through (calls are still counted). PA
      tokens); if usage is missing the estimate is booked (usage_source="estimate")
   6. every paid call (ok or failed) is appended to a JSONL cost ledger; once spent >= cap,
      every further call is refused. The cap is never raised automatically.
+  7. (Stage 3) pre-request call-count limit (OPSPILOT_PAID_MAX_CALLS, default 0 = no paid
+     calls), max output tokens clamp (OPSPILOT_PAID_MAX_OUTPUT_TOKENS, also used in the
+     estimate) and a concurrency limit (OPSPILOT_PAID_MAX_CONCURRENCY): a request that
+     cannot get a slot within OPSPILOT_PAID_CONCURRENCY_WAIT_S is refused, not queued forever.
 
 The API key is only ever read from the environment by Settings; nothing here logs or
 stores it, and ledger lines pass through core.redact.
@@ -26,7 +30,9 @@ stores it, and ledger lines pass through core.redact.
 from __future__ import annotations
 
 import json
+import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -88,9 +94,75 @@ class ModelGateway:
     calls: dict[str, int] = field(default_factory=dict)
     usage: dict[str, int] = field(default_factory=lambda: {"tokens_in": 0, "tokens_out": 0})
 
+    paid_calls: int = 0
+    reserved_cny: float = 0.0  # estimates of in-flight calls (concurrency-safe budget)
+    _slots: threading.BoundedSemaphore = None  # type: ignore[assignment]
+    _lock: threading.Lock = field(default_factory=threading.Lock)
+
     def __post_init__(self) -> None:
         self.prices = self.prices or PriceTable.load(self.settings.model_price_table)
         self.ledger = self.ledger or Ledger(Path(self.settings.model_ledger_path))
+        self._slots = threading.BoundedSemaphore(self.settings.paid_max_concurrency)
+
+    def clamp_output(self, max_tokens: int) -> int:
+        return min(int(max_tokens), int(self.settings.paid_max_output_tokens))
+
+    def guarded_call(
+        self,
+        *,
+        provider: str,
+        model: str,
+        kind: str,
+        est_in: int,
+        max_out: int,
+        fn: Callable[[int], tuple[Any, dict[str, int] | None]],
+        meta: dict[str, Any] | None = None,
+    ) -> Any:
+        """Generic paid call: ALL guards run before `fn(max_out_clamped)` is invoked.
+        `fn` returns (result, usage) with usage = {prompt_tokens, completion_tokens} or None."""
+        self._count(provider, kind)
+        max_out = self.clamp_output(max_out)
+        est = self._authorize(model, est_in, max_out)
+        if not self._slots.acquire(timeout=self.settings.paid_concurrency_wait_s):
+            self._release(est)
+            raise PaidCallRefused("paid concurrency limit: no free slot")
+        t0 = time.perf_counter()
+        rec: dict[str, Any] = {"provider": provider, "model": model, "kind": kind, **(meta or {})}
+        try:
+            try:
+                out, u = fn(max_out)
+            except Exception as exc:
+                self._book(
+                    reserved=est,
+                    rec={
+                        **rec,
+                        "ok": False,
+                        "error": type(exc).__name__,
+                        "cost_cny": est,
+                        "tokens_in": est_in,
+                        "tokens_out": max_out,
+                        "usage_source": "estimate (failed call booked conservatively)",
+                        "latency_ms": round((time.perf_counter() - t0) * 1e3, 1),
+                    },
+                )
+                raise
+        finally:
+            self._slots.release()
+        tin = int(u["prompt_tokens"]) if u else est_in
+        tout = int(u.get("completion_tokens", 0)) if u else max_out
+        self._book(
+            reserved=est,
+            rec={
+                **rec,
+                "ok": True,
+                "tokens_in": tin,
+                "tokens_out": tout,
+                "usage_source": "api" if u else "estimate",
+                "cost_cny": round(self.prices.cost(model, tin, tout), 8),
+                "latency_ms": round((time.perf_counter() - t0) * 1e3, 1),
+            },
+        )
+        return out
 
     # ------------------------------------------------------------------ guards
     @property
@@ -108,17 +180,35 @@ class ModelGateway:
         if self.cap <= 0:
             raise PaidCallRefused("paid call needs a budget cap > 0 (OPSPILOT_PAID_BUDGET_CNY)")
         est = self.prices.cost(model, est_in, est_out)
-        if self.spent_cny >= self.cap:
-            raise BudgetExceeded(f"budget exhausted: spent {self.spent_cny:.6f} >= cap {self.cap}")
-        if self.spent_cny + est > self.cap:
-            raise BudgetExceeded(
-                f"estimated cost {est:.6f} CNY would exceed remaining budget "
-                f"{self.cap - self.spent_cny:.6f} CNY (cap {self.cap})"
-            )
+        with self._lock:  # call-count check + reservation is atomic
+            if self.paid_calls >= s.paid_max_calls:
+                raise PaidCallRefused(
+                    f"paid call limit reached ({self.paid_calls}/{s.paid_max_calls}); "
+                    "set OPSPILOT_PAID_MAX_CALLS for an approved run"
+                )
+            self._check_budget(est)
+            self.paid_calls += 1
+            self.reserved_cny += est
         return est
 
-    def _book(self, rec: dict[str, Any]) -> None:
-        self.spent_cny += float(rec.get("cost_cny", 0.0))
+    def _release(self, est: float) -> None:
+        with self._lock:
+            self.reserved_cny = max(0.0, self.reserved_cny - est)
+
+    def _check_budget(self, est: float) -> None:
+        committed = self.spent_cny + self.reserved_cny
+        if committed >= self.cap:
+            raise BudgetExceeded(f"budget exhausted: committed {committed:.6f} >= cap {self.cap}")
+        if committed + est > self.cap:
+            raise BudgetExceeded(
+                f"estimated cost {est:.6f} CNY would exceed remaining budget "
+                f"{self.cap - committed:.6f} CNY (cap {self.cap})"
+            )
+
+    def _book(self, rec: dict[str, Any], reserved: float = 0.0) -> None:
+        with self._lock:  # move the reservation to spent atomically
+            self.reserved_cny = max(0.0, self.reserved_cny - reserved)
+            self.spent_cny += float(rec.get("cost_cny", 0.0))
         self.usage["tokens_in"] += int(rec.get("tokens_in", 0))
         self.usage["tokens_out"] += int(rec.get("tokens_out", 0))
         self.ledger.append(
@@ -154,7 +244,8 @@ class ModelGateway:
             out = provider.embed(texts)
         except Exception as exc:
             self._book(
-                {
+                reserved=est,
+                rec={
                     **rec,
                     "ok": False,
                     "error": type(exc).__name__,
@@ -162,13 +253,14 @@ class ModelGateway:
                     "tokens_in": est_in,
                     "usage_source": "estimate (failed call booked conservatively)",
                     "latency_ms": round((time.perf_counter() - t0) * 1e3, 1),
-                }
+                },
             )
             raise
         u = getattr(provider, "last_usage", None)
         tin = int(u["prompt_tokens"]) if u and u.get("prompt_tokens") is not None else est_in
         self._book(
-            {
+            reserved=est,
+            rec={
                 **rec,
                 "ok": True,
                 "tokens_in": tin,
@@ -176,7 +268,7 @@ class ModelGateway:
                 "usage_source": "api" if u else "estimate",
                 "cost_cny": round(self.prices.cost(provider.model, tin, 0), 8),
                 "latency_ms": round((time.perf_counter() - t0) * 1e3, 1),
-            }
+            },
         )
         return out
 
@@ -192,6 +284,7 @@ class ModelGateway:
         if llm.name not in PAID_PROVIDERS:
             return llm.chat(messages, temperature=temperature, max_tokens=max_tokens)
         est_in = sum(len(m.content) for m in messages)
+        max_tokens = self.clamp_output(max_tokens)
         est = self._authorize(llm.model, est_in, max_tokens)
         t0 = time.perf_counter()
         rec: dict[str, Any] = {"provider": llm.name, "model": llm.model, "kind": "chat"}
@@ -199,7 +292,8 @@ class ModelGateway:
             out = llm.chat(messages, temperature=temperature, max_tokens=max_tokens)
         except Exception as exc:
             self._book(
-                {
+                reserved=est,
+                rec={
                     **rec,
                     "ok": False,
                     "error": type(exc).__name__,
@@ -208,14 +302,15 @@ class ModelGateway:
                     "tokens_out": max_tokens,
                     "usage_source": "estimate (failed call booked conservatively)",
                     "latency_ms": round((time.perf_counter() - t0) * 1e3, 1),
-                }
+                },
             )
             raise
         has = out.usage.total_tokens > 0
         tin = out.usage.prompt_tokens if has else est_in
         tout = out.usage.completion_tokens if has else max_tokens
         self._book(
-            {
+            reserved=est,
+            rec={
                 **rec,
                 "ok": True,
                 "tokens_in": tin,
@@ -223,7 +318,7 @@ class ModelGateway:
                 "usage_source": "api" if has else "estimate",
                 "cost_cny": round(self.prices.cost(llm.model, tin, tout), 8),
                 "latency_ms": round((time.perf_counter() - t0) * 1e3, 1),
-            }
+            },
         )
         return out
 

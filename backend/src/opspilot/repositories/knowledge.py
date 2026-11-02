@@ -394,6 +394,28 @@ class KnowledgeRepository:
         )
         return [ChunkHit(r.id, float(r.rank)) for r in self.s.execute(stmt)]
 
+    def terms_cooccur(
+        self, user: User, parts: list[str], kb_ids: list[uuid.UUID] | None = None
+    ) -> bool:
+        """True if ONE chunk readable by `user` contains every part (case-insensitive
+        substring). ACL applies exactly as for retrieval. Used by the agent's evidence
+        sufficiency check: is the asked-about concept present in the user's knowledge at all?"""
+        if not parts:
+            return True
+        conds = [
+            Chunk.content.ilike(
+                "%" + p.replace("\\", "").replace("%", "").replace("_", "\\_") + "%"
+            )
+            for p in parts
+        ]
+        stmt = (
+            select(Chunk.id)
+            .join(Document, Document.id == Chunk.document_id)
+            .where(*self._searchable(user, kb_ids), *conds)
+            .limit(1)
+        )
+        return self.s.execute(stmt).first() is not None
+
     def load_chunks(
         self, ids: list[uuid.UUID]
     ) -> dict[uuid.UUID, tuple[Chunk, Document, DocumentVersion, KnowledgeBase]]:

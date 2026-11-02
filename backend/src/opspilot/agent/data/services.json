@@ -1,0 +1,14 @@
+{
+ "_doc": "Mock log ACL: a service's logs are readable by users who can read the KB that documents it (admin: all).",
+ "service_kb": {
+  "order-service": "order-platform",
+  "payment-gateway": "order-platform",
+  "inventory-service": "order-platform",
+  "auth-service": "public-faq"
+ },
+ "prefix_service": {
+  "ORD": "order-service",
+  "AUTH": "auth-service",
+  "ERR_PAY": "payment-gateway"
+ }
+}

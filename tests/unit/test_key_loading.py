@@ -32,7 +32,7 @@ def test_api_key_only_from_opspilot_prefixed_variable(monkeypatch) -> None:
 
 
 def test_no_tracked_file_references_another_projects_env() -> None:
-    out = subprocess.run(  # noqa: S603
+    out = subprocess.run(
         ["git", "grep", "-n", "-E", r"zhanggui[^ ]*/\.env|projects/[a-z-]+/\.env"],  # noqa: S607
         cwd=ROOT,
         capture_output=True,
