@@ -70,7 +70,9 @@ def main() -> int:
                     cp.write_row((i, rng.randrange(groups), vec(rng, args.dim)))
             res["load_s"] = round(time.perf_counter() - t0, 1)
             t0 = time.perf_counter()
-            c.execute("SET maintenance_work_mem = '512MB'")
+            # container /dev/shm is 64 MB: no parallel build (it allocates shared memory)
+            c.execute("SET maintenance_work_mem = '256MB'")
+            c.execute("SET max_parallel_maintenance_workers = 0")
             c.execute(
                 f"CREATE INDEX ON {SCHEMA}.items USING hnsw (embedding vector_cosine_ops) "
                 "WITH (m = 16, ef_construction = 64)"
