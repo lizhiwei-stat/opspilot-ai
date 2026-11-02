@@ -28,3 +28,8 @@ def test_prod_rejects_dev_secret() -> None:
 def test_embedding_dim_locked_to_schema() -> None:
     with pytest.raises(ValidationError, match="1024"):
         make_settings(embedding_dim=768)
+
+
+def test_prod_rejects_env_example_placeholder() -> None:
+    with pytest.raises(ValidationError, match="prod"):
+        make_settings(env="prod", jwt_secret="change-me-to-a-long-random-string-at-least-32-chars")

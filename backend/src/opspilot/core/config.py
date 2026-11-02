@@ -46,9 +46,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _check_prod(self) -> Settings:
-        if self.env == "prod" and self.jwt_secret.get_secret_value().startswith("dev-only"):
+        secret = self.jwt_secret.get_secret_value()
+        if self.env == "prod" and secret.startswith(("dev-only", "change-me")):
             raise ValueError("OPSPILOT_JWT_SECRET must be set in prod")
-        if len(self.jwt_secret.get_secret_value()) < 32:
+        if len(secret) < 32:
             raise ValueError("OPSPILOT_JWT_SECRET must be at least 32 characters")
         needs_key = "openai_compatible" in (self.llm_provider, self.embedding_provider)
         if needs_key and not self.llm_api_key.get_secret_value():

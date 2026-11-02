@@ -1,18 +1,21 @@
-# OpsPilot AI local stack. Run from repo root:  docker compose -f infra/docker-compose.yml up -d --build
+# OpsPilot AI local stack. Run from the repo root:
+#   docker compose --env-file .env -f infra/docker-compose.yml up -d --build
+# All ports bind to 127.0.0.1 only. Host ports / DB credentials come from .env (defaults below).
+# DB credentials are local-dev defaults; override OPSPILOT_PG_PASSWORD in .env for anything shared.
 name: opspilot
 services:
   postgres:
     image: pgvector/pgvector:0.8.7-pg17-trixie
     environment:
-      POSTGRES_USER: opspilot
-      POSTGRES_PASSWORD: opspilot
-      POSTGRES_DB: opspilot
-    ports: ["5432:5432"]
+      POSTGRES_USER: ${OPSPILOT_PG_USER:-opspilot}
+      POSTGRES_PASSWORD: ${OPSPILOT_PG_PASSWORD:-opspilot}
+      POSTGRES_DB: ${OPSPILOT_PG_DB:-opspilot}
+    ports: ["127.0.0.1:${OPSPILOT_PG_PORT:-5432}:5432"]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U opspilot -d opspilot"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -23,9 +26,10 @@ services:
       - path: ../.env
         required: false
     environment:
-      OPSPILOT_DATABASE_URL: postgresql+psycopg://opspilot:opspilot@postgres:5432/opspilot
-      OPSPILOT_CORS_ORIGINS: '["http://localhost:5173"]'
-    ports: ["8000:8000"]
+      # Inside the compose network the DB is always postgres:5432, regardless of host port.
+      OPSPILOT_DATABASE_URL: postgresql+psycopg://${OPSPILOT_PG_USER:-opspilot}:${OPSPILOT_PG_PASSWORD:-opspilot}@postgres:5432/${OPSPILOT_PG_DB:-opspilot}
+      OPSPILOT_CORS_ORIGINS: '["http://localhost:${OPSPILOT_FRONTEND_PORT:-5173}","http://127.0.0.1:${OPSPILOT_FRONTEND_PORT:-5173}"]'
+    ports: ["127.0.0.1:${OPSPILOT_BACKEND_PORT:-8000}:8000"]
     depends_on:
       postgres: { condition: service_healthy }
     healthcheck:
@@ -37,8 +41,10 @@ services:
   frontend:
     build: { context: .., dockerfile: infra/frontend.Dockerfile }
     environment:
+      # Vite dev server proxies /api and /health to the backend over the compose network,
+      # so the browser stays same-origin on the frontend port (no CORS needed).
       OPSPILOT_BACKEND_URL: http://backend:8000
-    ports: ["5173:5173"]
+    ports: ["127.0.0.1:${OPSPILOT_FRONTEND_PORT:-5173}:5173"]
     depends_on:
       backend: { condition: service_healthy }
 

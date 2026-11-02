@@ -14,7 +14,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, make_url, text
 from sqlalchemy.orm import Session
 
 from opspilot.core.config import Settings
@@ -32,6 +32,10 @@ def _db_url() -> str:
 @pytest.fixture(scope="session")
 def migrated_db() -> str:
     url = _db_url()
+    # Safety: this fixture DROPS every table. Refuse anything that is not a throwaway DB.
+    db_name = make_url(url).database or ""
+    if not db_name.endswith(("_test", "_rt")):
+        raise RuntimeError(f"refusing to reset non-test database {db_name!r}")
     try:
         with create_engine(url, connect_args={"connect_timeout": 2}).connect() as c:
             c.execute(text("SELECT 1"))
