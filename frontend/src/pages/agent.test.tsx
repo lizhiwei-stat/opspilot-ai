@@ -82,4 +82,59 @@ describe("Agent workbench", () => {
     expect(screen.getByText(/head_term_absent_from_accessible_kb/)).toBeTruthy();
     expect(screen.getByText(/年假/)).toBeTruthy();
   });
+
+  it("Stage 4: queue, return-for-revision (comment required), approve -> ticket + events, MCP audit", async () => {
+    const calls: string[] = [];
+    const draft = { draft_id: "d1", status: "pending_approval", title: "[order-service] ORD-5003", priority: "P2", service: "order-service", description: "解决方案…", revision: 1, parent_draft_id: null };
+    const pending: AgentRun = {
+      ...base, intent: "incident_ticket", status: "awaiting_approval", answer: "已生成待审核工单草稿",
+      pending_approval: { type: "ticket_draft_approval", draft_id: "d1", payload_sha256: "x" }, draft,
+    };
+    const revised: AgentRun = { ...pending, draft: { ...draft, draft_id: "d2", revision: 2, parent_draft_id: "d1" } };
+    const done: AgentRun = {
+      ...revised, status: "completed", pending_approval: null, draft: { ...revised.draft!, status: "executed" },
+      draft_result: { status: "executed", decision: "approved", approval_id: "ap1", reviewer_id: "a", decided_at: "2026-11-02T10:00:00Z", revision: 2, ticket_number: "TCK-0009", business_op: "update_ticket_status" },
+    };
+    let step = 0;
+    mockFetch((url, init) => {
+      calls.push(`${init?.method ?? "GET"} ${url} ${init?.body ?? ""}`);
+      if (url.endsWith("/api/v1/agent/approvals")) return { body: [pending] };
+      if (url.endsWith("/approval")) return { body: step++ === 0 ? revised : done };
+      if (url.includes("/api/v1/tickets/TCK-0009"))
+        return { body: { number: "TCK-0009", title: "t", priority: "P2", status: "open", service: "order-service", category: "incident", source_draft_id: "d2", created_at: "x", events: [{ from_status: null, to_status: "open", actor_id: "a", approver_id: "admin-uuid", approval_id: "ap1", approved_at: "2026-11-02T10:00:00Z", note: null, created_at: "x" }] } };
+      if (url.includes("/api/v1/mcp/audit"))
+        return { body: [{ side: "server", server: "ticket", tool: "update_ticket_status", transport: "stdio", user_role: "admin", thread_id: "t1", args_summary: {}, args_sha256: "h", status: "ok", error_class: null, error: null, duration_ms: 12, output_bytes: 100, created_at: "x" }] };
+      return undefined;
+    });
+    render(<Agent token="tok" user={admin} />);
+    fireEvent.click(screen.getByRole("button", { name: "刷新队列" }));
+    fireEvent.click(await screen.findByRole("button", { name: /打开 r1/ }));
+    expect(screen.getByLabelText("草稿内容").textContent).toContain("解决方案");
+    const back = screen.getByRole("button", { name: "退回修改" }) as HTMLButtonElement;
+    expect(back.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("审批意见"), { target: { value: "补充影响范围" } });
+    fireEvent.click(back);
+    await waitFor(() => expect(screen.getByText(/第 2 版/)).toBeTruthy());
+    expect(calls.some((c) => c.includes('"decision":"returned"') && c.includes("补充影响范围"))).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "批准" }));
+    await waitFor(() => expect(screen.getByLabelText("approval-result").textContent).toContain("TCK-0009"));
+    fireEvent.click(screen.getByRole("button", { name: "查看工单与状态流转" }));
+    await waitFor(() => expect(screen.getByLabelText("ticket-view").textContent).toContain("→ open"));
+    fireEvent.click(screen.getByRole("button", { name: "加载审计" }));
+    await waitFor(() => expect(screen.getAllByText("update_ticket_status").length).toBeGreaterThan(0));
+  });
+
+  it("non-admins see no approval buttons or queue", async () => {
+    const pending: AgentRun = {
+      ...base, status: "awaiting_approval",
+      pending_approval: { type: "ticket_draft_approval", draft_id: "d1", payload_sha256: "x" },
+      draft: { draft_id: "d1", status: "pending_approval", title: "t", priority: "P2", service: null },
+    };
+    mockFetch((url) => (url.endsWith("/api/v1/agent/runs") ? { body: pending } : undefined));
+    render(<Agent token="tok" user={{ ...admin, role: "user" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "运行" }));
+    await waitFor(() => expect(screen.getByText("等待审批")).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "批准" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "刷新队列" })).toBeNull();
+  });
 });

@@ -316,7 +316,26 @@ export interface AgentRun {
   degraded: string[];
   tools: AgentToolCall[];
   pending_approval: { type: string; draft_id: string; payload_sha256: string } | null;
-  draft: { draft_id: string; status: string; title: string; priority: string; service: string | null } | null;
+  draft: {
+    draft_id: string;
+    status: string;
+    title: string;
+    priority: string;
+    service: string | null;
+    description?: string;
+    revision?: number;
+    parent_draft_id?: string | null;
+  } | null;
+  draft_result?: {
+    status: string;
+    decision: string | null;
+    approval_id: string | null;
+    reviewer_id: string | null;
+    decided_at: string | null;
+    revision?: number;
+    ticket_number?: string | null;
+    business_op?: string | null;
+  } | null;
   usage: { tokens_in: number; tokens_out: number; cost_cny: number; source: string };
   latency_ms: number | null;
   failure_reason: string | null;
@@ -335,6 +354,52 @@ export const agent = {
   run: (token: string, question: string, thread_id?: string) =>
     request<AgentRun>("/api/v1/agent/runs", authJson(token, { question, thread_id })),
   get: (token: string, id: string) => request<AgentRun>(`/api/v1/agent/runs/${id}`, authJson(token)),
-  approve: (token: string, id: string, decision: "approved" | "rejected", comment = "") =>
+  approve: (token: string, id: string, decision: Decision, comment = "") =>
     request<AgentRun>(`/api/v1/agent/runs/${id}/approval`, authJson(token, { decision, comment })),
+  approvals: (token: string) => request<AgentRun[]>("/api/v1/agent/approvals", authJson(token)),
+};
+
+// ---------------------------------------------------------------- Stage 4: MCP / tickets
+export type Decision = "approved" | "rejected" | "returned";
+export interface TicketEventView {
+  from_status: string | null;
+  to_status: string;
+  actor_id: string | null;
+  approver_id: string | null;
+  approval_id: string | null;
+  approved_at: string | null;
+  note: string | null;
+  created_at: string;
+}
+export interface TicketView {
+  number: string;
+  title: string;
+  priority: string;
+  status: string;
+  service: string | null;
+  category: string;
+  source_draft_id: string | null;
+  created_at: string;
+  events: TicketEventView[];
+}
+export interface McpAuditRow {
+  side: "server" | "client";
+  server: string;
+  tool: string;
+  transport: string;
+  user_role: string | null;
+  thread_id: string | null;
+  args_summary: Record<string, unknown> | null;
+  args_sha256: string | null;
+  status: string;
+  error_class: string | null;
+  error: string | null;
+  duration_ms: number | null;
+  output_bytes: number | null;
+  created_at: string;
+}
+export const mcp = {
+  ticket: (token: string, n: string) => request<TicketView>(`/api/v1/tickets/${encodeURIComponent(n)}`, authJson(token)),
+  audit: (token: string, threadId: string) =>
+    request<McpAuditRow[]>(`/api/v1/mcp/audit?thread_id=${encodeURIComponent(threadId)}&limit=100`, authJson(token)),
 };

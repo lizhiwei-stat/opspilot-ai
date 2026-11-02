@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import { type AgentRun, type User, agent } from "../api";
+import { type AgentRun, type Decision, type McpAuditRow, type TicketView, type User, agent, mcp } from "../api";
 import { Badge, Card, ErrorText, MockNotice, type Tone, btn, btnPrimary, input } from "../components/ui";
 import { errText } from "../errors";
 
@@ -11,11 +11,13 @@ const STATUS: Record<AgentRun["status"], [string, Tone]> = {
   failed: ["失败", "red"],
   expired: ["已过期", "slate"],
 };
+const INCIDENT = "ORD-5003 错误，查文档和日志，分析并创建待审核工单";
 const EXAMPLES = [
   "ORD-5003 是什么错误，怎么处理",
   "查一下工单 TCK-0001 的状态",
   "支付网关的商户号是多少",
   "订单接口 500 了，帮我创建一个工单",
+  INCIDENT,
 ];
 
 export default function Agent({ token, user }: { token: string; user: User | null }) {
@@ -24,6 +26,10 @@ export default function Agent({ token, user }: { token: string; user: User | nul
   const [thread, setThread] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [comment, setComment] = useState("");
+  const [queue, setQueue] = useState<AgentRun[] | null>(null);
+  const [ticket, setTicket] = useState<TicketView | null>(null);
+  const [audit, setAudit] = useState<McpAuditRow[] | null>(null);
 
   async function exec(p: Promise<AgentRun>) {
     setBusy(true);
@@ -32,6 +38,9 @@ export default function Agent({ token, user }: { token: string; user: User | nul
       const r = await p;
       setRun(r);
       setThread(r.thread_id);
+      setTicket(null);
+      setAudit(null);
+      setComment("");
     } catch (err) {
       setError(errText(err));
     } finally {
@@ -43,7 +52,17 @@ export default function Agent({ token, user }: { token: string; user: User | nul
     void exec(agent.run(token, q, thread));
   };
 
+  async function side<T>(p: Promise<T>, set: (v: T) => void) {
+    setError(null);
+    try {
+      set(await p);
+    } catch (err) {
+      setError(errText(err));
+    }
+  }
+  const decide = (d: Decision) => run && void exec(agent.approve(token, run.run_id, d, comment));
   const turnTrace = run ? run.node_trace : [];
+  const result = run?.draft_result;
   return (
     <div className="space-y-6">
       <Card
@@ -75,6 +94,46 @@ export default function Agent({ token, user }: { token: string; user: User | nul
           <ErrorText error={error} />
         </div>
       </Card>
+
+      {user?.role === "admin" && (
+        <Card
+          label="approval-queue"
+          title="待审批队列"
+          actions={
+            <button type="button" className={btn} onClick={() => void side(agent.approvals(token), setQueue)}>
+              刷新队列
+            </button>
+          }
+        >
+          {queue === null ? (
+            <p className="text-xs text-slate-500">点击“刷新队列”加载所有等待审批的运行（重启后仍可恢复）。</p>
+          ) : queue.length === 0 ? (
+            <p className="text-sm text-slate-500">暂无待审批</p>
+          ) : (
+            <ul className="space-y-1 text-sm">
+              {queue.map((r) => (
+                <li key={r.run_id} className="flex items-center justify-between gap-2">
+                  <span className="truncate">
+                    {r.draft?.title ?? r.question} · 第 {r.draft?.revision ?? 1} 版
+                  </span>
+                  <button
+                    type="button"
+                    className={btn}
+                    onClick={() => {
+                      setRun(r);
+                      setThread(r.thread_id);
+                      setTicket(null);
+                      setAudit(null);
+                    }}
+                  >
+                    打开 {r.run_id.slice(0, 8)}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
 
       {run && (
         <>
@@ -137,16 +196,36 @@ export default function Agent({ token, user }: { token: string; user: User | nul
           {run.status === "awaiting_approval" && run.draft && (
             <Card label="approval" title="人工审批（工单草稿）">
               <p className="text-sm">
-                草稿「{run.draft.title}」· 优先级 {run.draft.priority} · 服务 {run.draft.service ?? "-"} · 状态 {run.draft.status}
+                草稿「{run.draft.title}」· 优先级 {run.draft.priority} · 服务 {run.draft.service ?? "-"} · 状态 {run.draft.status} · 第{" "}
+                {run.draft.revision ?? 1} 版
               </p>
+              {run.draft.description && (
+                <pre aria-label="草稿内容" className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-slate-50 p-2 font-sans text-xs">
+                  {run.draft.description}
+                </pre>
+              )}
               {user?.role === "admin" ? (
-                <div className="mt-3 flex gap-2">
-                  <button className={btnPrimary} disabled={busy} onClick={() => void exec(agent.approve(token, run.run_id, "approved"))}>
-                    批准
-                  </button>
-                  <button className={btn} disabled={busy} onClick={() => void exec(agent.approve(token, run.run_id, "rejected"))}>
-                    驳回
-                  </button>
+                <div className="mt-3 space-y-2">
+                  <textarea
+                    aria-label="审批意见"
+                    className={`${input} w-full`}
+                    rows={2}
+                    placeholder="审批意见（退回修改时必填）"
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <button className={btnPrimary} disabled={busy} onClick={() => decide("approved")}>
+                      批准
+                    </button>
+                    <button className={btn} disabled={busy} onClick={() => decide("rejected")}>
+                      驳回
+                    </button>
+                    <button className={btn} disabled={busy || !comment.trim()} onClick={() => decide("returned")}>
+                      退回修改
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400">审批由服务端校验管理员身份；对话或模型输出中的“已批准”文字不构成审批。</p>
                 </div>
               ) : (
                 <p className="mt-2 text-xs text-slate-500">需要管理员审批。管理员登录后可在此页打开该运行（run {run.run_id.slice(0, 8)}…）。</p>
@@ -155,6 +234,37 @@ export default function Agent({ token, user }: { token: string; user: User | nul
           )}
           {run.draft && run.status !== "awaiting_approval" && (
             <p className="text-xs text-slate-600" aria-label="draft-status">工单草稿状态：{run.draft.status}</p>
+          )}
+          {result && (
+            <Card label="ticket-result" title="审批结果与业务操作">
+              <p className="text-sm" aria-label="approval-result">
+                决定：{result.decision ?? "-"} · 审批时间 {result.decided_at ?? "-"} · 草稿第 {result.revision ?? 1} 版
+                {result.ticket_number && (
+                  <>
+                    {" "}· 已创建工单 <span className="font-mono">{result.ticket_number}</span>
+                  </>
+                )}
+              </p>
+              {result.ticket_number && (
+                <button type="button" className={`${btn} mt-2`} onClick={() => void side(mcp.ticket(token, result.ticket_number as string), setTicket)}>
+                  查看工单与状态流转
+                </button>
+              )}
+              {ticket && (
+                <div className="mt-2 text-xs" aria-label="ticket-view">
+                  <p>
+                    {ticket.number} · {ticket.title} · {ticket.priority} · 状态 {ticket.status}
+                  </p>
+                  <ul className="mt-1 list-disc pl-5">
+                    {ticket.events.map((e, i) => (
+                      <li key={i}>
+                        {e.from_status ?? "∅"} → {e.to_status} · 审批人 {e.approver_id?.slice(0, 8) ?? "-"} · {e.approved_at ?? e.created_at}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </Card>
           )}
 
           <div className="grid gap-6 md:grid-cols-2">
@@ -196,6 +306,45 @@ export default function Agent({ token, user }: { token: string; user: User | nul
               )}
             </Card>
           </div>
+
+          <Card
+            label="mcp-audit"
+            title="MCP 审计（本会话）"
+            actions={
+              <button type="button" className={btn} onClick={() => void side(mcp.audit(token, run.thread_id), setAudit)}>
+                加载审计
+              </button>
+            }
+          >
+            {audit === null ? (
+              <p className="text-xs text-slate-500">服务端与客户端两侧的 MCP 调用记录（参数已脱敏，仅摘要与哈希）。</p>
+            ) : (
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-slate-500">
+                    <th>侧</th>
+                    <th>服务</th>
+                    <th>工具</th>
+                    <th>状态</th>
+                    <th>耗时</th>
+                    <th>错误</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {audit.map((a, i) => (
+                    <tr key={i} className="border-t">
+                      <td>{a.side}</td>
+                      <td>{a.server}</td>
+                      <td className="font-mono">{a.tool}</td>
+                      <td>{a.status}</td>
+                      <td>{a.duration_ms ?? "-"}ms</td>
+                      <td className="truncate">{a.error ?? ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Card>
 
           <Card label="agent-evidence" title={`证据（${run.evidence.length}）· 判定：${run.assessment.decision ?? "-"}`}>
             {run.assessment.reasons && <p className="mb-2 text-xs text-slate-500">依据：{run.assessment.reasons.join("，")}</p>}
