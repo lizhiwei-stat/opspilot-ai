@@ -1,11 +1,27 @@
 # ruff: noqa
 """Build notebooks/real_embedding_hybrid.ipynb (Chinese walkthrough). Execute with nbconvert."""
+
 import json
 from pathlib import Path
 
 cells = []
-def md(s): cells.append({"cell_type": "markdown", "metadata": {}, "source": s.strip()})
-def code(s): cells.append({"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": s.strip()})
+
+
+def md(s):
+    cells.append({"cell_type": "markdown", "metadata": {}, "source": s.strip()})
+
+
+def code(s):
+    cells.append(
+        {
+            "cell_type": "code",
+            "metadata": {},
+            "execution_count": None,
+            "outputs": [],
+            "source": s.strip(),
+        }
+    )
+
 
 md("""# Stage 2.5：真实本地 Embedding、混合检索与 Reranker（中文讲解）
 
@@ -76,7 +92,9 @@ for d, sc in sorted(zip(docs, scores), key=lambda x: -x[1]):
     print(f"{sc:.4f}  double_sigmoid={1/(1+math.exp(-sc)):.4f}  {d[:24]}…")
 print(f"4 段耗时 {dt*1000:.0f} ms（CPU）")""")
 md("## 4. 真实评测结果：Mock vs 真实 Embedding（读取已提交 JSON）")
-code("""print((ROOT / "docs/reports/STAGE2_5_TABLES.md").read_text(encoding="utf-8").split("## 问答拒答：dev")[0])""")
+code(
+    """print((ROOT / "docs/reports/STAGE2_5_TABLES.md").read_text(encoding="utf-8").split("## 问答拒答：dev")[0])"""
+)
 md("""**解读**：bge-small + cross-encoder 是两套数据上唯一 Recall@5=1.0 的配置，但每查询约 2 秒；held-out 上 mock vector 反而高于 bge-small vector——42 个 chunk 的小语料不足以给出"语义一定更好"的强结论。
 
 ## 5. held-out 揭示的阈值过拟合""")
@@ -92,10 +110,19 @@ code("""for f in sorted(glob.glob(str(ROOT / "evals/results/*iterscan*.json"))):
     print(f"n={p['n']} 选择度={p['selectivity']} ef_search={p['ef_search']} pgvector={d['pgvector']}")
     for mode, r in d["settings"].items():
         print(f"  {mode:14s} 平均返回 {r['rows_returned_mean']:>5}  召回 {r['recall_vs_exact']:.3f}  P50 {r['latency_ms_p50']} ms")""")
-md("""1% 选择度下，关闭 iterative scan 时 HNSW 过滤后几乎返回不了结果（平均 0.37 行），relaxed_order 召回 0.72 最优，因此应用默认 `relaxed_order` 并在外层重新排序。""")
+md(
+    """1% 选择度下，关闭 iterative scan 时 HNSW 过滤后几乎返回不了结果（平均 0.37 行），relaxed_order 召回 0.72 最优，因此应用默认 `relaxed_order` 并在外层重新排序。"""
+)
 
-nb = {"cells": cells, "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
-      "language_info": {"name": "python"}}, "nbformat": 4, "nbformat_minor": 5}
+nb = {
+    "cells": cells,
+    "metadata": {
+        "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
+        "language_info": {"name": "python"},
+    },
+    "nbformat": 4,
+    "nbformat_minor": 5,
+}
 out = Path(__file__).resolve().parents[1] / "notebooks" / "real_embedding_hybrid.ipynb"
 out.write_text(json.dumps(nb, ensure_ascii=False, indent=1), encoding="utf-8")
 print(out)
