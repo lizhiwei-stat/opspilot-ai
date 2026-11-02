@@ -3,8 +3,8 @@
 > Production-oriented AI Support & Ticket Resolution Platform
 > 面向软件企业技术支持 / 研发 / 客服团队的智能技术支持 Agent 平台：查文档、查日志、给出有出处的故障建议、生成待审工单，人工审批后才落库。
 
-**当前进度：阶段 2.5（真实免费本地 Embedding + 混合检索评测）已完成，在 WSL2 + Docker Compose 上实测（tag `stage-2.5`）** —— 详见 [docs/PROGRESS.md](docs/PROGRESS.md)、[阶段 2.5 报告](docs/reports/STAGE2_5_REPORT.md)、[阶段 2.5 评测](docs/reports/STAGE2_5_EVAL.md)、[阶段 3 设计](docs/STAGE3_DESIGN.md)。
-Agent、MCP、工单审批尚未实现（第三、四阶段）。README 只写已经验证过的内容。
+**当前进度：阶段 3（LangGraph 企业 Agent，Mock）已完成，在 WSL2 + Docker Compose 上实测（tag `stage-3`）** —— 详见 [docs/PROGRESS.md](docs/PROGRESS.md)、[阶段 3 报告](docs/reports/STAGE3_REPORT.md)、[Agent State](docs/AGENT_STATE.md)、[ADR-003](docs/adr/ADR-003-stage3-agent.md)。
+Agent 默认 Mock（规则 + 抽取式，未调用大模型）；真实 Qwen 测试待授权（[方案](docs/STAGE3_QWEN_TEST_PLAN.md)）。MCP 与真实建单尚未实现（第四阶段）。README 只写已经验证过的内容。
 
 > ⚠️ 默认 **Mock 模式**：mock embedding 是特征哈希的字/词袋向量，**没有语义理解**；mock 回答器是**抽取式**的（摘录原文 + 引用），**没有调用大模型**。界面和接口都明确标注了这一点。阶段 2.5 起可选**免费本地 CPU 模型**（bge-small-zh-v1.5 / bge-m3 embedding、bge-reranker-base 重排），已实测；真实 DashScope / Qwen 付费路径有多重守卫，**尚未运行**（[方案待批准](docs/STAGE2_5_PAID_EMBED_PLAN.md)）。
 
@@ -13,12 +13,13 @@ Agent、MCP、工单审批尚未实现（第三、四阶段）。README 只写�
 ## 文档
 - [PRD 需求说明](docs/PRD.md) · [架构说明](docs/ARCHITECTURE.md) · [数据库设计](docs/DATABASE.md) · [API 设计](docs/API.md)
 - [阶段进度](docs/PROGRESS.md) · [阶段 1 报告](docs/reports/STAGE1_REPORT.md) · [阶段 2 设计](docs/STAGE2_DESIGN.md) · [阶段 2 报告](docs/reports/STAGE2_REPORT.md) · [检索评测报告](docs/reports/STAGE2_EVAL.md)
+- [阶段 3 报告](docs/reports/STAGE3_REPORT.md) · [Agent State](docs/AGENT_STATE.md) · [ADR-003](docs/adr/ADR-003-stage3-agent.md) · [Agent 流程图](docs/diagrams/stage3_agent_graph.png) · [Qwen 测试方案（未执行）](docs/STAGE3_QWEN_TEST_PLAN.md)
 - [阶段 2.5 报告](docs/reports/STAGE2_5_REPORT.md) · [阶段 2.5 评测](docs/reports/STAGE2_5_EVAL.md) · [评测汇总表](docs/reports/STAGE2_5_TABLES.md) · [付费 Embedding 对照方案（未执行）](docs/STAGE2_5_PAID_EMBED_PLAN.md) · [阶段 3 设计](docs/STAGE3_DESIGN.md)
 - [RAG 流程 Notebook（中文，含输出）](notebooks/rag_walkthrough.ipynb) · [真实 Embedding / 混合检索 Notebook（中文，含输出）](notebooks/real_embedding_hybrid.ipynb)
 
 ## 技术栈
 FastAPI · Pydantic v2 · SQLAlchemy 2 · Alembic · PostgreSQL + pgvector（HNSW）+ 全文检索（GIN）· jieba · pypdf · LangChain text-splitters · PyJWT + Argon2 · structlog · React 19 + TypeScript + Vite + Tailwind v4 ·
-（后续阶段）LangGraph · MCP Python SDK · Qwen（OpenAI 兼容）。
+LangGraph（StateGraph + PostgresSaver）· Qwen（OpenAI 兼容，可选，默认 Mock）；（后续阶段）MCP Python SDK。
 版本与选型依据见 [ARCHITECTURE.md §5](docs/ARCHITECTURE.md)。
 
 ## 快速开始（Windows + WSL2，从零开始）
@@ -98,6 +99,17 @@ cd frontend && npm ci && npm run dev      # :5173，需要 Node 22
 **免费本地模型（阶段 2.5，CPU，不需要 Key）**：`uv sync --group local-embed`（装 torch CPU 版约 1 GB；注意 `--all-groups` 也会装它），设置 `OPSPILOT_EMBEDDING_PROVIDER=local`（默认 bge-small-zh-v1.5，固定 revision），可选 `OPSPILOT_RERANKER=cross_encoder`（约 2 秒/查询）。首次下载模型后可设 `HF_HUB_OFFLINE=1`。每个 embedding 模型有独立索引，切换模型不会删除或混用旧向量，需对文档「重建索引」。
 本地评测：`uv run --group local-embed python evals/run_retrieval_eval.py --embedding local --dataset dev|heldout --rerankers rule,cross_encoder`。
 **付费路径**（`--embedding dashscope --i-understand-this-costs-money`）另需 `OPSPILOT_ALLOW_PAID_API=true`、`OPSPILOT_PAID_APPROVAL_ID`、`OPSPILOT_PAID_BUDGET_CNY`，超出预算在发请求前拒绝；**尚未运行**。
+
+## 阶段 3：Agent（Mock）
+```bash
+# 检查点表（backend 启动时自动 setup；也可手动）
+uv run python -m opspilot.agent.checkpoint setup
+# 41 场景 Agent 评测（Mock，免费；只在 *_test / *_eval 库上 --prepare）
+uv run python evals/run_agent_eval.py --prepare --db-url "$OPSPILOT_TEST_DATABASE_URL" --tag local
+# 实时栈冒烟：发起审批 → 重启 backend → 审批恢复
+uv run python scripts/agent_api_smoke.py start && docker compose --env-file .env -f infra/docker-compose.yml restart backend && uv run python scripts/agent_api_smoke.py approve
+```
+前端「Agent」页：执行轨迹、工具调用、证据、tokens/耗时、拒答原因、Mock 标注、管理员审批卡片、多轮追问。
 
 ## 常用命令
 | 命令 | 作用 |
