@@ -60,7 +60,7 @@ def decode_access_token(settings: Settings, token: str) -> dict[str, Any]:
         try:
             u = jwt.decode(token, options={"verify_signature": False})
             times = {k: u.get(k) for k in ("iat", "nbf", "exp")}
-        except Exception:  # noqa: BLE001
+        except Exception:
             times = {}
         _log.info(
             "auth_token_rejected",
