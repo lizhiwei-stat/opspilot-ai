@@ -3,12 +3,12 @@
 > Production-oriented AI Support & Ticket Resolution Platform
 > 面向软件企业技术支持 / 研发 / 客服团队的智能技术支持 Agent 平台：查文档、查日志、给出有出处的故障建议、生成待审工单，人工审批后才落库。
 
-**当前进度：阶段 4（MCP 工具接入 + 审批工作流，Mock 模型）已完成，在 WSL2 + Docker Compose 上实测（tag `stage-4`）** —— 详见 [docs/PROGRESS.md](docs/PROGRESS.md)、[阶段 4 报告](docs/reports/STAGE4_REPORT.md)、[ADR-004](docs/adr/ADR-004-stage4-mcp.md)。
+**当前进度：阶段 5（企业级 Web 平台，Mock 模型）已完成，在 WSL2 + Docker Compose + Windows Edge 上实测（tag `stage-5`）** —— 详见 [阶段 5 报告](docs/reports/STAGE5_REPORT.md)、[页面地图](docs/PAGE_MAP.md)、[阶段 5 API](docs/API_STAGE5.md)、[演示脚本](docs/DEMO_SCRIPT.md)、[docs/PROGRESS.md](docs/PROGRESS.md)。
 工具经真实 MCP 协议（官方 SDK mcp 2.3，stdio 子进程）调用；审批通过后才由 Ticket MCP 创建正式工单。Agent 默认 Mock（规则 + 抽取式，未调用大模型）；阶段 4 的真实 Qwen 测试待授权（[预算方案](docs/STAGE4_QWEN_BUDGET_PLAN.md)）。README 只写已经验证过的内容。
 
 > ⚠️ 默认 **Mock 模式**：mock embedding 是特征哈希的字/词袋向量，**没有语义理解**；mock 回答器是**抽取式**的（摘录原文 + 引用），**没有调用大模型**。界面和接口都明确标注了这一点。阶段 2.5 起可选**免费本地 CPU 模型**（bge-small-zh-v1.5 / bge-m3 embedding、bge-reranker-base 重排），已实测；真实 DashScope / Qwen 付费路径有多重守卫，**尚未运行**（[方案待批准](docs/STAGE2_5_PAID_EMBED_PLAN.md)）。
 
-![评测页：Mock vs 真实 Embedding 并排对比（WSL2 实测，Windows Edge 截图）](docs/assets/stage25-evals-matrix.png)
+![阶段 5 仪表盘（Windows Edge 截图，数据来自数据库）](docs/assets/stage5/s5_dashboard_after.png)
 
 ## 文档
 - [PRD 需求说明](docs/PRD.md) · [架构说明](docs/ARCHITECTURE.md) · [数据库设计](docs/DATABASE.md) · [API 设计](docs/API.md)
@@ -100,6 +100,21 @@ cd frontend && npm ci && npm run dev      # :5173，需要 Node 22
 **免费本地模型（阶段 2.5，CPU，不需要 Key）**：`uv sync --group local-embed`（装 torch CPU 版约 1 GB；注意 `--all-groups` 也会装它），设置 `OPSPILOT_EMBEDDING_PROVIDER=local`（默认 bge-small-zh-v1.5，固定 revision），可选 `OPSPILOT_RERANKER=cross_encoder`（约 2 秒/查询）。首次下载模型后可设 `HF_HUB_OFFLINE=1`。每个 embedding 模型有独立索引，切换模型不会删除或混用旧向量，需对文档「重建索引」。
 本地评测：`uv run --group local-embed python evals/run_retrieval_eval.py --embedding local --dataset dev|heldout --rerankers rule,cross_encoder`。
 **付费路径**（`--embedding dashscope --i-understand-this-costs-money`）另需 `OPSPILOT_ALLOW_PAID_API=true`、`OPSPILOT_PAID_APPROVAL_ID`、`OPSPILOT_PAID_BUDGET_CNY`，超出预算在发请求前拒绝；**尚未运行**。
+
+## 阶段 5：Web 平台
+| 地址 | 说明 |
+|---|---|
+| http://localhost:5173 | 开发版（Vite） |
+| http://localhost:5180 | 生产版（nginx，`docker compose --env-file .env -f infra/docker-compose.yml -f infra/docker-compose.prod.yml --profile prod up -d --build frontend_prod`） |
+| http://localhost:8020/docs | 后端 API |
+
+三种角色：系统管理员（admin）、技术支持工程师（support，种子账号 sam@opspilot.local）、普通业务用户（user）。页面：仪表盘、智能体工作台（SSE 实时节点 / 工具 / 证据，断线按 Last-Event-ID 续传）、知识库与授权、工单中心与审批、执行可视化、评测与监控、用户与权限、系统设置（密钥只显示是否配置）。
+```bash
+cd frontend && npm run lint && npx tsc --noEmit -p . && npx vitest run && npm run build
+# Windows Edge 全量 E2E（开发版 + 生产版，截图）
+powershell -ExecutionPolicy Bypass -File scripts\e2e_windows.ps1 -Shots C:\tmp\shots -ProdUrl http://localhost:5180
+```
+升级到阶段 5 需要迁移 0006（backend 启动时自动执行；建议先 `pg_dump` 备份）。
 
 ## 阶段 4：MCP 工具 + 审批工作流（Mock 模型）
 三个 MCP Server（stdio，后端按需拉起，无需单独部署）：

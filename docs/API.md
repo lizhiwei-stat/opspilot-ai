@@ -1,6 +1,8 @@
 # API 设计
 
-Base URL：`http://localhost:8000`。交互式文档：`/docs`（Swagger）、`/openapi.json`。
+> 阶段 5 新增接口（SSE、仪表盘、工单流转、用户与权限、知识库授权、评测结果）见 [API_STAGE5.md](API_STAGE5.md)。
+
+Base URL：`http://localhost:8020`（compose 默认端口）。交互式文档：`/docs`（Swagger）、`/openapi.json`。
 认证：`Authorization: Bearer <JWT>`。所有响应带 `X-Request-ID`。
 
 **统一错误格式**
@@ -24,7 +26,7 @@ Base URL：`http://localhost:8000`。交互式文档：`/docs`（Swagger）、`/
 |---|---|---|---|---|
 | POST | `/api/v1/auth/login` | 公开 | `{email,password}` → `{access_token, token_type, expires_in, user}`；邮箱不区分大小写；错误信息统一，不泄露账号是否存在 | ✅ |
 | GET | `/api/v1/auth/me` | 登录 | 当前用户 | ✅ |
-| GET/POST/PATCH | `/api/v1/users` | admin | 用户管理 | 🔜 5 |
+| GET/POST/PATCH | `/api/v1/admin/users` | admin | 用户管理（见 API_STAGE5） | ✅ 5 |
 
 ## 知识库与检索（阶段 2）✅
 权限：读 = admin / public / owner / `kb_permissions` 授权；写 = admin / owner / `write|admin` 授权。无读权限一律 **404**（不暴露资源是否存在），有读无写 **403**。
@@ -48,10 +50,10 @@ Base URL：`http://localhost:8000`。交互式文档：`/docs`（Swagger）、`/
 
 上传解析错误码：`unsupported_type` `empty_file` `too_large` `content_mismatch` `binary_content` `decode_failed` `pdf_encrypted` `pdf_corrupt` `pdf_no_text` `no_chunks` `embedding_failed`。
 
-🔜 知识库创建 / 授权管理接口（`POST /knowledge-bases`、`PUT/DELETE …/permissions/{user_id}`）放在阶段 5 管理界面，目前由种子脚本创建。
+✅ 知识库创建与授权管理接口已在阶段 5 实现（`POST /knowledge-bases`、`GET/PUT …/permissions`），见 [API_STAGE5.md](API_STAGE5.md)。
 
 ## Agent（原设计，已被下方阶段 3 实现取代）
-SSE 流式事件（`text/event-stream`、`/events`）**尚未实现**，留待后续阶段；当前实现见下节。
+SSE 流式事件已在阶段 5 实现：`GET /api/v1/agent/runs/{id}/events`，见 [API_STAGE5.md](API_STAGE5.md)。
 
 ## 工单与审批（阶段 4）
 | 方法 | 路径 | 权限 | 说明 |
