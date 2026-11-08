@@ -1,231 +1,245 @@
-import { type FormEvent, useCallback, useEffect, useState } from "react";
-import { ApiError, api, type Readiness, type User, type Version } from "./api";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { ApiError, api, type Role, ROLE_LABEL, type Version } from "./api";
+import { Badge, ErrorText, Field, Loading, btn, btnPrimary, input } from "./components/ui";
+import { Link, match, navigate, query, usePath } from "./lib/router";
+import { SessionProvider, useSession } from "./lib/session";
 import Agent from "./pages/Agent";
-import Evals from "./pages/Evals";
-import Knowledge from "./pages/Knowledge";
-import QA from "./pages/QA";
-import SearchDebug from "./pages/SearchDebug";
+import AdminUsers from "./pages/AdminUsers";
+import Dashboard from "./pages/Dashboard";
+import EvalCenter from "./pages/EvalCenter";
+import Executions from "./pages/Executions";
+import KnowledgeCenter from "./pages/KnowledgeCenter";
+import Settings from "./pages/Settings";
+import Tickets from "./pages/Tickets";
+import Workspace from "./pages/Workspace";
 
-const TABS = [
-  ["overview", "概览"],
-  ["knowledge", "知识库"],
-  ["search", "检索调试"],
-  ["qa", "问答"],
-  ["agent", "Agent"],
-  ["evals", "评测"],
-] as const;
-type Tab = (typeof TABS)[number][0];
-const tabFromHash = (): Tab => {
-  const h = window.location.hash.replace("#", "");
-  return (TABS.some(([k]) => k === h) ? h : "overview") as Tab;
+interface NavItem {
+  to: string;
+  label: string;
+  icon: string;
+  roles?: Role[];
+}
+export const NAV: NavItem[] = [
+  { to: "/", label: "仪表盘", icon: "▦" },
+  { to: "/workspace", label: "智能体工作台", icon: "✦" },
+  { to: "/knowledge", label: "知识库", icon: "▤" },
+  { to: "/tickets", label: "工单中心", icon: "☰" },
+  { to: "/executions", label: "执行可视化", icon: "⇢" },
+  { to: "/evals", label: "评测与监控", icon: "◔" },
+  { to: "/admin/users", label: "用户与权限", icon: "⚑", roles: ["admin"] },
+  { to: "/admin/settings", label: "系统设置", icon: "⚙", roles: ["admin"] },
+  { to: "/lab/agent", label: "Agent 调试台(Stage4)", icon: "⌁", roles: ["admin"] },
+];
+
+// Stage <=4 used hash tabs; keep old bookmarks working.
+const LEGACY: Record<string, string> = {
+  "#overview": "/",
+  "#knowledge": "/knowledge",
+  "#search": "/knowledge?tab=search",
+  "#qa": "/knowledge?tab=qa",
+  "#agent": "/workspace",
+  "#evals": "/evals",
 };
 
-const TOKEN_KEY = "opspilot.token";
-
-function Badge({ ok, label }: { ok: boolean; label: string }) {
+export default function App() {
   return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-        ok ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
-      }`}
-    >
-      {label}
-    </span>
+    <SessionProvider>
+      <Shell />
+    </SessionProvider>
   );
 }
 
-export default function App() {
-  const [ready, setReady] = useState<Readiness | null>(null);
-  const [version, setVersion] = useState<Version | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>(tabFromHash);
-  const [email, setEmail] = useState("alice@opspilot.local");
-  const [password, setPassword] = useState("");
-  const [authError, setAuthError] = useState<string | null>(null);
+function Shell() {
+  const path = usePath();
+  const s = useSession();
+  const pathname = path.split("?")[0];
 
-  const refresh = useCallback(async () => {
-    setLoadError(null);
-    try {
-      const [r, v] = await Promise.all([api.ready(), api.version()]);
-      setReady(r);
-      setVersion(v);
-    } catch (e) {
-      setLoadError(e instanceof ApiError ? `${e.code}: ${e.message}` : String(e));
-    }
+  useEffect(() => {
+    const target = LEGACY[window.location.hash];
+    if (target) navigate(target, true);
   }, []);
 
   useEffect(() => {
-    void refresh();
-    const saved = sessionStorage.getItem(TOKEN_KEY);
-    if (saved)
-      api
-        .me(saved)
-        .then((u) => {
-          setUser(u);
-          setToken(saved);
-        })
-        .catch(() => sessionStorage.removeItem(TOKEN_KEY));
-    const onHash = () => setTab(tabFromHash());
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
-  }, [refresh]);
+    if (s.loading) return;
+    if (!s.token && pathname !== "/login") navigate(`/login?next=${encodeURIComponent(path)}`, true);
+    if (s.token && pathname === "/login") navigate(query(path).get("next") || "/", true);
+  }, [s.loading, s.token, pathname, path]);
 
-  async function onLogin(e: FormEvent) {
+  if (s.loading) return <Loading label="正在恢复会话…" />;
+  if (pathname === "/login" || !s.token || !s.user) return <LoginPage />;
+
+  const item = NAV.find((n) => (n.to === "/" ? pathname === "/" : pathname === n.to || pathname.startsWith(`${n.to}/`)));
+  const allowed = !item?.roles || s.can(...item.roles);
+  return (
+    <Layout pathname={pathname}>
+      {!allowed ? (
+        <Forbidden />
+      ) : (
+        route(pathname, path)
+      )}
+    </Layout>
+  );
+}
+
+function route(pathname: string, path: string): ReactNode {
+  let m: Record<string, string> | null;
+  if (pathname === "/") return <Dashboard />;
+  if (pathname === "/workspace") return <Workspace />;
+  if ((m = match("/workspace/:threadId", pathname))) return <Workspace threadId={m.threadId} />;
+  if (pathname === "/knowledge") return <KnowledgeCenter tab={query(path).get("tab") ?? "docs"} />;
+  if (pathname === "/tickets") return <Tickets tab={query(path).get("tab") ?? "list"} />;
+  if ((m = match("/tickets/:number", pathname))) return <Tickets tab="list" number={m.number} />;
+  if (pathname === "/executions") return <Executions />;
+  if ((m = match("/executions/:runId", pathname))) return <Executions runId={m.runId} />;
+  if (pathname === "/evals") return <EvalCenter tab={query(path).get("tab") ?? "results"} />;
+  if (pathname === "/admin/users") return <AdminUsers />;
+  if (pathname === "/admin/settings") return <Settings />;
+  if (pathname === "/lab/agent") return <LegacyAgent />;
+  return (
+    <div className="rounded-xl border bg-white p-8 text-center">
+      <p className="font-medium">页面不存在</p>
+      <Link to="/" className="mt-2 inline-block text-sm text-indigo-600 underline">
+        返回仪表盘
+      </Link>
+    </div>
+  );
+}
+
+function LegacyAgent() {
+  const { token, user } = useSession();
+  return <Agent token={token!} user={user} />;
+}
+
+function Forbidden() {
+  return (
+    <div role="alert" aria-label="forbidden" className="rounded-xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-700">
+      <p className="font-medium">无权访问此页面</p>
+      <p className="mt-1 text-sm">该页面需要更高权限；后端接口同样会拒绝（HTTP 403）。</p>
+    </div>
+  );
+}
+
+function Layout({ pathname, children }: { pathname: string; children: ReactNode }) {
+  const s = useSession();
+  const [open, setOpen] = useState(false);
+  const [version, setVersion] = useState<Version | null>(null);
+  useEffect(() => {
+    api.version().then(setVersion).catch(() => setVersion(null));
+  }, []);
+  const items = NAV.filter((n) => !n.roles || s.can(...n.roles));
+  const active = (to: string) => (to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`));
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 lg:flex">
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:p-2">
+        跳到主要内容
+      </a>
+      <aside
+        className={`${open ? "block" : "hidden"} border-r border-slate-200 bg-slate-900 text-slate-100 lg:sticky lg:top-0 lg:block lg:h-screen lg:w-60 lg:shrink-0`}
+      >
+        <div className="px-5 py-5">
+          <p className="text-base font-semibold">OpsPilot AI</p>
+          <p className="text-xs text-slate-400">企业智能运维支持平台</p>
+        </div>
+        <nav aria-label="主导航" className="space-y-0.5 px-3">
+          {items.map((n) => (
+            <Link
+              key={n.to}
+              to={n.to}
+              onClick={() => setOpen(false)}
+              aria-current={active(n.to) ? "page" : undefined}
+              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm ${active(n.to) ? "bg-indigo-600 text-white" : "text-slate-300 hover:bg-slate-800 hover:text-white"}`}
+            >
+              <span aria-hidden className="w-4 text-center">
+                {n.icon}
+              </span>
+              {n.label}
+            </Link>
+          ))}
+        </nav>
+        {version && (
+          <p className="px-5 py-4 text-[11px] text-slate-500">
+            v{version.version} · Stage {version.stage} · {version.env}
+            <br />
+            LLM {version.llm_provider} · Emb {version.embedding_provider}
+          </p>
+        )}
+      </aside>
+      <div className="min-w-0 flex-1">
+        <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:px-8">
+          <button className={`${btn} lg:hidden`} aria-label="切换导航" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+            ☰
+          </button>
+          <span className="hidden text-sm text-slate-500 lg:block">{NAV.find((n) => active(n.to))?.label}</span>
+          <div className="flex items-center gap-3 text-sm" aria-label="当前用户">
+            <span className="font-medium">{s.user?.display_name}</span>
+            <Badge tone={s.user?.role === "admin" ? "indigo" : s.user?.role === "support" ? "sky" : "slate"}>{s.user ? ROLE_LABEL[s.user.role] : ""}</Badge>
+            <button
+              className={btn}
+              onClick={() => {
+                s.logout();
+                navigate("/login", true);
+              }}
+            >
+              退出登录
+            </button>
+          </div>
+        </header>
+        <main id="main" className="mx-auto max-w-7xl px-4 py-6 lg:px-8">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+function LoginPage() {
+  const s = useSession();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [touched, setTouched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const emailErr = touched && !EMAIL.test(email) ? "请输入有效邮箱" : null;
+  const pwErr = touched && !password ? "请输入密码" : null;
+
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setAuthError(null);
+    setTouched(true);
+    if (!EMAIL.test(email) || !password) return;
+    setBusy(true);
+    setError(null);
     try {
-      const res = await api.login(email, password);
-      sessionStorage.setItem(TOKEN_KEY, res.access_token);
-      setUser(await api.me(res.access_token));
-      setToken(res.access_token);
+      await s.login(email.trim(), password);
       setPassword("");
     } catch (err) {
-      setAuthError(err instanceof ApiError ? err.message : String(err));
+      setError(err instanceof ApiError ? (err.status === 401 ? "邮箱或密码错误" : `${err.message}（${err.code}）`) : String(err));
+    } finally {
+      setBusy(false);
     }
   }
 
-  function logout() {
-    sessionStorage.removeItem(TOKEN_KEY);
-    setUser(null);
-    setToken(null);
-  }
-
   return (
-    <div className="min-h-screen text-slate-800">
-      <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <h1 className="text-lg font-semibold">
-            OpsPilot AI <span className="text-sm font-normal text-slate-500">智能技术支持平台</span>
-          </h1>
-          {version && (
-            <span className="text-xs text-slate-500">
-              v{version.version} · Stage {version.stage} · {version.env}
-            </span>
-          )}
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-indigo-900 p-4">
+      <form onSubmit={onSubmit} noValidate aria-label="登录表单" className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-7 shadow-2xl">
+        <div>
+          <h1 className="text-lg font-semibold">OpsPilot AI</h1>
+          <p className="text-sm text-slate-500">企业智能运维支持平台 · 请登录</p>
         </div>
-        <nav className="mx-auto flex max-w-7xl gap-1 px-6" aria-label="主导航">
-          {TABS.map(([key, label]) => (
-            <a
-              key={key}
-              href={`#${key}`}
-              aria-current={tab === key ? "page" : undefined}
-              className={`border-b-2 px-3 py-2 text-sm ${
-                tab === key ? "border-indigo-600 font-medium text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              {label}
-            </a>
-          ))}
-          {user && <span className="ml-auto self-center text-xs text-slate-500">{user.display_name}</span>}
-        </nav>
-      </header>
-
-      {tab !== "overview" && (
-        <main className="mx-auto max-w-7xl px-6 py-8">
-          {!token ? (
-            <p className="rounded-xl border bg-white p-6 text-sm text-slate-600">
-              请先在 <a href="#overview" className="text-indigo-600 underline">概览</a> 页登录。
-            </p>
-          ) : tab === "knowledge" ? (
-            <Knowledge token={token} />
-          ) : tab === "search" ? (
-            <SearchDebug token={token} embeddingProvider={version?.embedding_provider} />
-          ) : tab === "qa" ? (
-            <QA token={token} />
-          ) : tab === "agent" ? (
-            <Agent token={token} user={user} />
-          ) : (
-            <Evals token={token} />
-          )}
-        </main>
-      )}
-
-      <main hidden={tab !== "overview"} className="mx-auto grid max-w-7xl gap-6 px-6 py-8 md:grid-cols-2">
-        <section className="rounded-xl border bg-white p-5 shadow-sm" aria-label="system-status">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold">系统状态</h2>
-            <button onClick={() => void refresh()} className="text-sm text-indigo-600 hover:underline">
-              刷新
-            </button>
-          </div>
-          {loadError && <p className="text-sm text-rose-600">加载失败：{loadError}</p>}
-          {ready && (
-            <>
-              <p className="mb-3">
-                <Badge ok={ready.status === "ready"} label={ready.status === "ready" ? "就绪" : "未就绪"} />
-              </p>
-              <ul className="space-y-2">
-                {ready.checks.map((c) => (
-                  <li key={c.name} className="flex items-start justify-between gap-3 text-sm">
-                    <span className="font-mono">{c.name}</span>
-                    <span className="flex-1 truncate text-slate-500" title={c.detail}>
-                      {c.detail}
-                    </span>
-                    <Badge ok={c.ok} label={c.ok ? `${c.latency_ms}ms` : "失败"} />
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-          {version && (
-            <dl className="mt-4 grid grid-cols-2 gap-1 border-t pt-3 text-xs text-slate-500">
-              <dt>LLM</dt>
-              <dd>
-                {version.llm_provider} / {version.llm_model}
-              </dd>
-              <dt>Embedding</dt>
-              <dd>
-                {version.embedding_provider} / {version.embedding_model} ({version.embedding_dim})
-              </dd>
-            </dl>
-          )}
-        </section>
-
-        <section className="rounded-xl border bg-white p-5 shadow-sm" aria-label="auth">
-          <h2 className="mb-4 font-semibold">登录</h2>
-          {user ? (
-            <div className="space-y-2 text-sm">
-              <p>
-                已登录：<strong>{user.display_name}</strong>（{user.email}）
-              </p>
-              <p>
-                角色：<Badge ok label={user.role === "admin" ? "管理员" : "普通用户"} />
-              </p>
-              <button onClick={logout} className="rounded-md border px-3 py-1.5 hover:bg-slate-50">
-                退出登录
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={onLogin} className="space-y-3 text-sm">
-              <label className="block">
-                邮箱
-                <input
-                  className="mt-1 w-full rounded-md border px-3 py-2"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="username"
-                />
-              </label>
-              <label className="block">
-                密码
-                <input
-                  type="password"
-                  className="mt-1 w-full rounded-md border px-3 py-2"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                />
-              </label>
-              {authError && <p className="text-rose-600">{authError}</p>}
-              <button type="submit" className="w-full rounded-md bg-indigo-600 py-2 text-white hover:bg-indigo-700">
-                登录
-              </button>
-            </form>
-          )}
-        </section>
-      </main>
+        {s.expired && <ErrorText error="会话已失效，请重新登录" />}
+        <Field label="邮箱" error={emailErr}>
+          <input className={`${input} w-full`} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" aria-invalid={!!emailErr} />
+        </Field>
+        <Field label="密码" error={pwErr}>
+          <input className={`${input} w-full`} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" aria-invalid={!!pwErr} />
+        </Field>
+        <ErrorText error={error} />
+        <button type="submit" disabled={busy} className={`${btnPrimary} w-full py-2`}>
+          {busy ? "登录中…" : "登录"}
+        </button>
+        <p className="text-xs text-slate-400">令牌仅保存在当前标签页 sessionStorage，关闭标签页即清除。</p>
+      </form>
     </div>
   );
 }

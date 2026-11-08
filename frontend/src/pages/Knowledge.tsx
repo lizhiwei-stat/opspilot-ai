@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { type ChunkInfo, type DocumentInfo, type KnowledgeBase, rag } from "../api";
-import { Badge, Card, ErrorText, STATUS_LABEL, STATUS_TONE, btn, btnPrimary } from "../components/ui";
+import { Badge, Card, ConfirmDialog, ErrorText, STATUS_LABEL, STATUS_TONE, btn, btnPrimary } from "../components/ui";
 import { errText } from "../errors";
 
 const VIS_LABEL = { public: "公开", restricted: "受限", private: "私有" } as const;
 
-export default function Knowledge({ token }: { token: string }) {
+export default function Knowledge({ token, reloadKey = 0 }: { token: string; reloadKey?: number }) {
+  const [pendingDelete, setPendingDelete] = useState<DocumentInfo | null>(null);
   const [kbs, setKbs] = useState<KnowledgeBase[]>([]);
   const [kbId, setKbId] = useState<string | null>(null);
   const [docs, setDocs] = useState<DocumentInfo[]>([]);
@@ -35,7 +36,7 @@ export default function Knowledge({ token }: { token: string }) {
     }
   }, [token, kbId]);
 
-  useEffect(() => void loadKbs(), [loadKbs]);
+  useEffect(() => void loadKbs(), [loadKbs, reloadKey]);
   useEffect(() => {
     setSelected(null);
     void loadDocs();
@@ -146,16 +147,28 @@ export default function Knowledge({ token }: { token: string }) {
                     <td className="space-x-2 text-right">
                       {kb?.can_write && (
                         <>
+                          <label className={`${btn} cursor-pointer`} title="上传同名文件生成新版本，旧版本分块会被替换">
+                            更新
+                            <input
+                              type="file"
+                              aria-label={`更新 ${d.source_name}`}
+                              accept=".pdf,.md,.markdown,.txt"
+                              className="hidden"
+                              disabled={busy}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                e.target.value = "";
+                                if (f) void onUpload(new File([f], d.source_name, { type: f.type }));
+                              }}
+                            />
+                          </label>
                           <button className={btn} disabled={busy} onClick={() => void act(async () => (await rag.reindex(token, d.id)).message)}>
                             重建索引
                           </button>
                           <button
                             className={`${btn} text-rose-700`}
                             disabled={busy}
-                            onClick={() => {
-                              if (window.confirm(`删除 ${d.source_name}？其全部分块会被移除。`))
-                                void act(async () => `已删除，移除 ${(await rag.remove(token, d.id)).removed_chunks} 个分块`);
-                            }}
+                            onClick={() => setPendingDelete(d)}
                           >
                             删除
                           </button>
@@ -170,6 +183,18 @@ export default function Knowledge({ token }: { token: string }) {
         </Card>
         {selected && <DocumentDetail token={token} doc={selected} />}
       </div>
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="删除文档"
+        body={`删除 ${pendingDelete?.source_name ?? ""}？其全部分块会从检索中移除（文档记录保留为已删除状态）。`}
+        confirmText="删除"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const d = pendingDelete!;
+          setPendingDelete(null);
+          void act(async () => `已删除，移除 ${(await rag.remove(token, d.id)).removed_chunks} 个分块`);
+        }}
+      />
     </div>
   );
 }

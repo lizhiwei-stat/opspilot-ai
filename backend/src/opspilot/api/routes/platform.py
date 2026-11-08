@@ -119,6 +119,23 @@ def dashboard(user: CurrentUser, db: DbDep) -> dict[str, Any]:
         for d, n, c in db.execute(dq2)
     ]
 
+    lq = select(
+        func.percentile_cont(0.5).within_group(AgentRun.latency_ms),
+        func.percentile_cont(0.95).within_group(AgentRun.latency_ms),
+        func.count(),
+    ).where(
+        AgentRun.status.in_((*_TERMINAL, "awaiting_approval")), AgentRun.latency_ms.is_not(None)
+    )
+    if not scope_all_runs:
+        lq = lq.where(AgentRun.user_id == user.id)
+    p50, p95, n_lat = db.execute(lq).one()
+    latency = {
+        "p50_ms": round(float(p50), 1) if p50 is not None else None,
+        "p95_ms": round(float(p95), 1) if p95 is not None else None,
+        "n": int(n_lat),
+        "source": "agent_runs.latency_ms (backend wall time per run, all turns)",
+    }
+
     rr = select(AgentRun).order_by(AgentRun.created_at.desc()).limit(8)
     if not scope_all_runs:
         rr = rr.where(AgentRun.user_id == user.id)
@@ -157,6 +174,7 @@ def dashboard(user: CurrentUser, db: DbDep) -> dict[str, Any]:
                 "source": "agent_runs",
             },
             "daily": daily,
+            "latency": latency,
         },
         "tool_success": _ratio(tools.get("ok", 0), tools_total)
         | {

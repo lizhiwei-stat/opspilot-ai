@@ -10,6 +10,7 @@ const STATUS: Record<AgentRun["status"], [string, Tone]> = {
   refused: ["已拒答", "red"],
   failed: ["失败", "red"],
   expired: ["已过期", "slate"],
+  aborted: ["已中断", "amber"],
 };
 const INCIDENT = "ORD-5003 错误，查文档和日志，分析并创建待审核工单";
 const EXAMPLES = [

@@ -19,6 +19,8 @@ def test_dashboard_real_counts_and_denominators(api) -> None:
     ts = d["agent_runs"]["task_success"]
     assert ts["denominator"] >= 1 and ts["numerator"] <= ts["denominator"]
     assert ts["value"] == round(ts["numerator"] / ts["denominator"], 4)
+    lat = d["agent_runs"]["latency"]
+    assert lat["n"] >= 1 and lat["p50_ms"] is not None and lat["p95_ms"] >= lat["p50_ms"]
     tool = d["tool_success"]
     assert tool["denominator"] == sum(tool["by_status"].values())
     assert d["usage"]["mock"]["cost_cny"] == 0 and d["usage"]["real"]["runs"] == 0
