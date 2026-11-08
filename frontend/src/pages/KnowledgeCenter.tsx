@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { type KbPermissions, platform, rag } from "../api";
+import { type KbPermissions, api, platform, rag } from "../api";
 import { Badge, Card, ConfirmDialog, EmptyState, ErrorText, Field, Loading, PageHeader, Tabs, btn, btnPrimary, input, select } from "../components/ui";
 import { errText } from "../errors";
 import { useAsync } from "../lib/hooks";
@@ -15,6 +15,10 @@ export default function KnowledgeCenter({ tab }: { tab: string }) {
   const { token } = useAuth();
   const t = (["docs", "search", "qa", "manage"].includes(tab) ? tab : "docs") as T;
   const [reloadKey, setReloadKey] = useState(0);
+  const [embedding, setEmbedding] = useState<string | undefined>();
+  useEffect(() => {
+    api.version().then((v) => setEmbedding(v.embedding_provider)).catch(() => setEmbedding(undefined));
+  }, []);
   return (
     <div>
       <PageHeader title="知识库" subtitle="复用 Stage 2/2.5 RAG：混合检索 + 重排 + 引用；权限在数据库查询层强制执行" />
@@ -30,7 +34,7 @@ export default function KnowledgeCenter({ tab }: { tab: string }) {
         ]}
       />
       {t === "docs" && <Knowledge token={token} reloadKey={reloadKey} />}
-      {t === "search" && <SearchDebug token={token} />}
+      {t === "search" && <SearchDebug token={token} embeddingProvider={embedding} />}
       {t === "qa" && <QA token={token} />}
       {t === "manage" && <Manage onChanged={() => setReloadKey((k) => k + 1)} />}
     </div>
