@@ -21,6 +21,8 @@ DEMO_USERS = [
     ("admin@opspilot.local", "Ops Admin", "admin", "OPSPILOT_SEED_ADMIN_PASSWORD"),
     ("alice@opspilot.local", "Alice (Support)", "user", "OPSPILOT_SEED_USER_PASSWORD"),
     ("bob@opspilot.local", "Bob (R&D)", "user", "OPSPILOT_SEED_USER_PASSWORD"),
+    # Stage 5: 技术支持工程师 (support) role - sees all tickets, can transition them, no approval
+    ("sam@opspilot.local", "Sam (技术支持工程师)", "support", "OPSPILOT_SEED_USER_PASSWORD"),
 ]
 DEMO_KBS = [
     ("order-platform", "订单平台技术文档", "订单服务 API、发布记录与故障手册", "restricted"),

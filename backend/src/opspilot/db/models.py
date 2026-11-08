@@ -46,7 +46,7 @@ def _uuid_pk() -> Mapped[uuid.UUID]:
 # ---------------------------------------------------------------- identity / ACL
 class User(TimestampMixin, Base):
     __tablename__ = "users"
-    __table_args__ = (CheckConstraint("role IN ('user','admin')", name="role_valid"),)
+    __table_args__ = (CheckConstraint("role IN ('user','support','admin')", name="role_valid"),)
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
@@ -556,4 +556,40 @@ class TicketEvent(Base):
     note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# ---------------------------------------------------------------- stage 5: streaming + admin audit
+class AgentEvent(Base):
+    """Durable, replayable progress events of one agent run (SSE source). `seq` is the SSE
+    event id within the run; clients resume with Last-Event-ID / ?after=seq."""
+
+    __tablename__ = "agent_events"
+    __table_args__ = (UniqueConstraint("run_id", "seq", name="uq_agent_events_run_seq"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    seq: Mapped[int] = mapped_column(Integer, nullable=False)
+    type: Mapped[str] = mapped_column(String(32), nullable=False)
+    data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AdminAudit(Base):
+    """Who changed what in user / role / KB-permission / ticket administration."""
+
+    __tablename__ = "admin_audit"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    actor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    action: Mapped[str] = mapped_column(String(48), nullable=False)
+    target_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    target_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    detail: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )

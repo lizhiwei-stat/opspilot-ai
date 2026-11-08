@@ -6,6 +6,7 @@ thread_id = one conversation (checkpointer thread); each user message is a new t
 
 from __future__ import annotations
 
+import threading
 import time
 import uuid
 from collections.abc import Callable
@@ -23,10 +24,14 @@ from opspilot.agent.llm import AgentLLM, build_agent_llm
 from opspilot.core.config import Settings
 from opspilot.core.errors import ConflictError, ForbiddenError, NotFoundError
 from opspilot.core.logging import get_logger
-from opspilot.db.models import AgentRun, AgentStep, TicketDraft, ToolCall, User
+from opspilot.db.models import AgentEvent, AgentRun, AgentStep, TicketDraft, ToolCall, User
 
 log = get_logger()
 _TERMINAL = ("completed", "refused", "failed", "expired")
+CANCELLED = "cancelled_by_user"
+# Documented SSE/agent_events types (see docs/api/STAGE5_API.md). Node/event streaming only:
+# no token streaming and no private chain-of-thought - `detail` is the node's system summary.
+EVENT_TYPES = ("run_started", "node", "tool", "evidence", "interrupt", "cancel_requested", "final")
 
 
 class AgentService:
@@ -47,6 +52,10 @@ class AgentService:
             AgentDeps(settings, session_factory, embedder, self.llm, faults, llm_faults),
             checkpointer=saver,
         )
+        self._seq: dict[uuid.UUID, int] = {}
+        self._cancel: set[uuid.UUID] = set()
+        self._active: set[uuid.UUID] = set()
+        self._lock = threading.Lock()
 
     # ---------------------------------------------------------------- helpers
     def _cfg(self, thread_id: str) -> dict[str, Any]:
@@ -61,17 +70,116 @@ class AgentService:
             raise NotFoundError("agent run not found")  # no existence oracle
         return run
 
+    # ---------------------------------------------------------------- events
+    def _emit(self, run_id: uuid.UUID, type_: str, data: dict[str, Any]) -> int:
+        with self._lock, self.sf() as sess:
+            if run_id not in self._seq:
+                self._seq[run_id] = int(
+                    sess.scalar(
+                        select(func.coalesce(func.max(AgentEvent.seq), 0)).where(
+                            AgentEvent.run_id == run_id
+                        )
+                    )
+                    or 0
+                )
+            self._seq[run_id] += 1
+            seq = self._seq[run_id]
+            sess.add(AgentEvent(run_id=run_id, seq=seq, type=type_, data=data))
+            sess.commit()
+            return seq
+
+    def _emit_update(self, run_id: uuid.UUID, node: str, upd: Any) -> None:
+        if node == "__interrupt__":
+            vals = [getattr(i, "value", None) for i in (upd or [])]
+            self._emit(
+                run_id, "interrupt", {"node": "approval", "value": vals[0] if vals else None}
+            )
+            return
+        if not isinstance(upd, dict):
+            return
+        for n in upd.get("node_trace") or []:
+            self._emit(
+                run_id,
+                "node",
+                {
+                    "node": n.get("node", node),
+                    "status": n.get("status"),
+                    "ms": round(float(n.get("ms", 0)), 1),
+                    "detail": n.get("detail") or {},
+                },
+            )
+        for r in upd.get("tool_records") or []:
+            self._emit(
+                run_id,
+                "tool",
+                {
+                    k: r.get(k)
+                    for k in ("tool", "status", "error_class", "attempts", "duration_ms", "call_id")
+                }
+                | {"result": str(r.get("result_summary") or "")[:200]},
+            )
+        ev = upd.get("evidence")
+        if ev:
+            self._emit(
+                run_id,
+                "evidence",
+                {
+                    "count": len(ev),
+                    "items": [
+                        {k: e.get(k) for k in ("id", "source", "title", "locator", "flagged")}
+                        for e in ev[:8]
+                    ],
+                },
+            )
+
+    def request_cancel(self, run_id: uuid.UUID, user: User) -> dict[str, Any]:
+        """Cooperative interrupt: the graph stops at the next node boundary; the run becomes
+        `aborted` and can be continued with resume (completed nodes are not re-run)."""
+        with self.sf() as sess:
+            run = self._load(sess, run_id, user)
+            if run.status != "running":
+                raise ConflictError(f"run is {run.status}, not running")
+        self._cancel.add(run_id)
+        self._emit(run_id, "cancel_requested", {"by": str(user.id)})
+        return {"run_id": str(run_id), "cancel_requested": True}
+
     def _invoke(self, run_id: uuid.UUID, thread_id: str, payload: Any) -> None:
         t0 = time.perf_counter()
         err = None
+        self._active.add(run_id)
         try:
-            self.graph.invoke(payload, self._cfg(thread_id))
+            for chunk in self.graph.stream(payload, self._cfg(thread_id), stream_mode="updates"):
+                for node, upd in (chunk or {}).items():
+                    self._emit_update(run_id, node, upd)
+                if run_id in self._cancel:
+                    err = CANCELLED
+                    break
         except GraphRecursionError:
             err = "recursion_limit"
         except Exception as exc:  # unexpected crash: state stays at the last checkpoint
             err = f"crash:{type(exc).__name__}"
             log.warning("agent_run_crashed", run_id=str(run_id), error=type(exc).__name__)
-        self._persist(run_id, thread_id, (time.perf_counter() - t0) * 1000, err)
+        finally:
+            self._cancel.discard(run_id)
+            self._active.discard(run_id)
+        try:
+            self._persist(run_id, thread_id, (time.perf_counter() - t0) * 1000, err)
+        finally:
+            with self.sf() as sess:
+                r = sess.get(AgentRun, run_id)
+                st, e = (r.status, r.error) if r else ("failed", err)
+            self._emit(run_id, "final", {"status": st, "error": e})
+
+    def _dispatch(self, run_id: uuid.UUID, thread_id: str, payload: Any, background: bool) -> None:
+        if not background:
+            self._invoke(run_id, thread_id, payload)
+            return
+        threading.Thread(
+            target=self._invoke,
+            args=(run_id, thread_id, payload),
+            daemon=True,
+            name=f"agent-{run_id}",
+        ).start()
 
     def _persist(self, run_id: uuid.UUID, thread_id: str, ms: float, err: str | None) -> None:
         snap = self.graph.get_state(self._cfg(thread_id))
@@ -81,7 +189,9 @@ class AgentService:
         status = v.get("status") or "failed"
         if interrupts:
             status = "awaiting_approval"
-        elif err:
+        elif err == CANCELLED and snap.next:
+            status = "aborted"
+        elif err and err != CANCELLED:
             status = "failed"
         elif snap.next:  # stopped mid-graph without an interrupt
             status = "failed"
@@ -147,7 +257,9 @@ class AgentService:
             sess.commit()
 
     # ---------------------------------------------------------------- API
-    def start(self, user: User, question: str, thread_id: str | None = None) -> dict[str, Any]:
+    def start(
+        self, user: User, question: str, thread_id: str | None = None, background: bool = False
+    ) -> dict[str, Any]:
         thread_id = thread_id or uuid.uuid4().hex
         with self.sf() as sess:
             rows = sess.scalars(select(AgentRun).where(AgentRun.thread_id == thread_id)).all()
@@ -155,6 +267,10 @@ class AgentService:
                 raise NotFoundError("thread not found")
             if any(r.status in ("awaiting_approval", "running") for r in rows):
                 raise ConflictError("thread has a run awaiting approval or still running")
+            if any(r.status == "aborted" and r.error == CANCELLED for r in rows):
+                snap = self.graph.get_state(self._cfg(thread_id))
+                if snap.next:
+                    raise ConflictError("thread has an interrupted run; resume it first")
             turn = max((r.turn for r in rows), default=0) + 1
             run = AgentRun(
                 thread_id=thread_id,
@@ -172,7 +288,8 @@ class AgentService:
             except IntegrityError as exc:
                 raise ConflictError("concurrent turn on this thread") from exc
             run_id = run.id
-        self._invoke(
+        self._emit(run_id, "run_started", {"thread_id": thread_id, "turn": turn, "kind": "turn"})
+        self._dispatch(
             run_id,
             thread_id,
             {
@@ -183,10 +300,18 @@ class AgentService:
                 "run_id": str(run_id),
                 "turn": turn,
             },
+            background,
         )
         return self.view(run_id, user)
 
-    def approve(self, run_id: uuid.UUID, reviewer: User, decision: str, comment: str = "") -> dict:
+    def approve(
+        self,
+        run_id: uuid.UUID,
+        reviewer: User,
+        decision: str,
+        comment: str = "",
+        background: bool = False,
+    ) -> dict:
         if reviewer.role != "admin":
             raise ForbiddenError("approval requires admin")
         if decision not in ("approved", "rejected", "returned"):
@@ -206,10 +331,20 @@ class AgentService:
             if expired
             else {"decision": decision, "reviewer_id": str(reviewer.id), "comment": comment[:500]}
         )
-        self._invoke(run_id, thread_id, Command(resume=payload))
+        self._mark_running(run_id)
+        self._emit(run_id, "run_started", {"kind": "approval", "decision": payload["decision"]})
+        self._dispatch(run_id, thread_id, Command(resume=payload), background)
         return self.view(run_id, reviewer)
 
-    def resume(self, run_id: uuid.UUID, user: User) -> dict[str, Any]:
+    def _mark_running(self, run_id: uuid.UUID) -> None:
+        with self.sf() as sess:
+            r = sess.get(AgentRun, run_id)
+            if r is not None:
+                r.status = "running"
+                r.finished_at = None
+                sess.commit()
+
+    def resume(self, run_id: uuid.UUID, user: User, background: bool = False) -> dict[str, Any]:
         """Continue a run that stopped mid-graph (process crash/restart) from its last
         checkpoint. Completed nodes - including side-effecting tool calls - are not re-run."""
         with self.sf() as sess:
@@ -220,7 +355,11 @@ class AgentService:
             raise ConflictError("run is waiting for approval; use the approval endpoint")
         if not snap.next or (snap.values or {}).get("run_id") != str(run_id):
             raise ConflictError(f"nothing to resume (status={status})")
-        self._invoke(run_id, thread_id, None)
+        if run_id in self._active:
+            raise ConflictError("run is still executing")
+        self._mark_running(run_id)
+        self._emit(run_id, "run_started", {"kind": "resume"})
+        self._dispatch(run_id, thread_id, None, background)
         return self.view(run_id, user)
 
     def expire_stale(self) -> int:
@@ -304,6 +443,57 @@ class AgentService:
                 "llm": f"{run.llm_provider}:{run.llm_model}",
                 "created_at": run.created_at.isoformat(),
             }
+
+    def events(
+        self, run_id: uuid.UUID, user: User, after: int = 0, limit: int = 500
+    ) -> tuple[str, list[dict[str, Any]]]:
+        """(run status, events with seq > after) - the SSE endpoint polls this."""
+        with self.sf() as sess:
+            run = self._load(sess, run_id, user)
+            rows = sess.scalars(
+                select(AgentEvent)
+                .where(AgentEvent.run_id == run_id, AgentEvent.seq > after)
+                .order_by(AgentEvent.seq)
+                .limit(limit)
+            ).all()
+            return run.status, [
+                {"seq": e.seq, "type": e.type, "data": e.data, "at": e.created_at.isoformat()}
+                for e in rows
+            ]
+
+    def threads(self, user: User, limit: int = 50) -> list[dict[str, Any]]:
+        with self.sf() as sess:
+            q = select(AgentRun).order_by(AgentRun.created_at.desc()).limit(1000)
+            if user.role != "admin":
+                q = q.where(AgentRun.user_id == user.id)
+            out: dict[str, dict[str, Any]] = {}
+            for r in sess.scalars(q):
+                t = out.setdefault(
+                    r.thread_id,
+                    {
+                        "thread_id": r.thread_id,
+                        "last_status": r.status,
+                        "last_run_id": str(r.id),
+                        "updated_at": r.created_at.isoformat(),
+                        "turns": 0,
+                        "title": r.input_text[:80],
+                        "is_mock": r.is_mock,
+                    },
+                )
+                t["turns"] += 1
+                if r.turn == 1:
+                    t["title"] = r.input_text[:80]
+            return list(out.values())[:limit]
+
+    def thread_runs(self, thread_id: str, user: User) -> list[dict[str, Any]]:
+        with self.sf() as sess:
+            q = select(AgentRun.id).where(AgentRun.thread_id == thread_id).order_by(AgentRun.turn)
+            if user.role != "admin":
+                q = q.where(AgentRun.user_id == user.id)
+            ids = list(sess.scalars(q))
+        if not ids:
+            raise NotFoundError("thread not found")
+        return [self.view(i, user) for i in ids]
 
     def list(self, user: User, limit: int = 20) -> list[dict[str, Any]]:
         with self.sf() as sess:

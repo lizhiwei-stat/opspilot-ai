@@ -69,8 +69,14 @@ def mcp_audit(
     ]
 
 
-def _ticket(t: Ticket, events: list[TicketEvent]) -> dict[str, Any]:
+def _ticket(
+    t: Ticket, events: list[TicketEvent], names: dict[Any, str] | None = None
+) -> dict[str, Any]:
+    names = names or {}
     return {
+        "description": t.description,
+        "resolution": t.resolution,
+        "updated_at": t.updated_at.isoformat(),
         "number": t.number,
         "title": t.title,
         "priority": t.priority,
@@ -84,6 +90,8 @@ def _ticket(t: Ticket, events: list[TicketEvent]) -> dict[str, Any]:
                 "from_status": e.from_status,
                 "to_status": e.to_status,
                 "actor_id": str(e.actor_id) if e.actor_id else None,
+                "actor_name": names.get(e.actor_id),
+                "approver_name": names.get(e.approver_id),
                 "approver_id": str(e.approver_id) if e.approver_id else None,
                 "approval_id": str(e.approval_id) if e.approval_id else None,
                 "approved_at": e.approved_at.isoformat() if e.approved_at else None,
@@ -97,13 +105,29 @@ def _ticket(t: Ticket, events: list[TicketEvent]) -> dict[str, Any]:
 
 @router.get("/tickets")
 def list_tickets(
-    db: DbDep, user: CurrentUser, limit: int = Query(default=20, ge=1, le=100)
+    db: DbDep,
+    user: CurrentUser,
+    limit: int = Query(default=20, ge=1, le=100),
+    q: str = Query(default="", max_length=100),
+    status: str | None = Query(default=None, pattern="^(open|in_progress|resolved|closed)$"),
+    priority: str | None = Query(default=None, pattern="^P[1-4]$"),
 ) -> list[dict[str, Any]]:
-    q = select(Ticket).order_by(Ticket.created_at.desc()).limit(limit)
-    if user.role != "admin":
-        q = q.where(or_(Ticket.reporter_id == user.id, Ticket.assignee_id == user.id))
+    """Tickets visible to the caller (admin/support: all; user: reported or assigned),
+    with optional keyword / status / priority filters (Stage 5)."""
+    stmt = select(Ticket).order_by(Ticket.created_at.desc()).limit(limit)
+    if user.role not in ("admin", "support"):
+        stmt = stmt.where(or_(Ticket.reporter_id == user.id, Ticket.assignee_id == user.id))
+    if q.strip():
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(
+            or_(Ticket.number.ilike(like), Ticket.title.ilike(like), Ticket.service.ilike(like))
+        )
+    if status:
+        stmt = stmt.where(Ticket.status == status)
+    if priority:
+        stmt = stmt.where(Ticket.priority == priority)
     out = []
-    for t in db.scalars(q):
+    for t in db.scalars(stmt):
         ev = db.scalars(
             select(TicketEvent)
             .where(TicketEvent.ticket_id == t.id)
@@ -116,9 +140,11 @@ def list_tickets(
 @router.get("/tickets/{number}")
 def get_ticket(number: str, db: DbDep, user: CurrentUser) -> dict[str, Any]:
     t = db.scalar(select(Ticket).where(Ticket.number == number[:32]))
-    if t is None or (user.role != "admin" and user.id not in (t.reporter_id, t.assignee_id)):
+    staff = user.role in ("admin", "support")
+    if t is None or (not staff and user.id not in (t.reporter_id, t.assignee_id)):
         raise NotFoundError("ticket not found")  # same answer for "not yours"
     ev = db.scalars(
         select(TicketEvent).where(TicketEvent.ticket_id == t.id).order_by(TicketEvent.created_at)
     ).all()
-    return _ticket(t, list(ev))
+    names = {u.id: u.display_name for u in db.scalars(select(User))}
+    return _ticket(t, list(ev), names)

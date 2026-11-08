@@ -23,6 +23,8 @@ EXPECTED_TABLES = {
     "ticket_drafts",
     "approvals",
     "agent_runs",
+    "agent_events",
+    "admin_audit",
     "mcp_tool_audit",
     "ticket_events",
     "agent_steps",

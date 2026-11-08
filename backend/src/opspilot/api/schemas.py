@@ -24,7 +24,7 @@ class UserOut(BaseModel):
     id: uuid.UUID
     email: str
     display_name: str
-    role: Literal["user", "admin"]
+    role: Literal["user", "support", "admin"]
 
 
 class LoginResponse(TokenResponse):

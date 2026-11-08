@@ -119,6 +119,7 @@ class Settings(BaseSettings):
     mcp_http_allowed_origins: tuple[str, ...] = ()
     model_ledger_path: str = "data/ledger/model_calls.jsonl"
     model_price_table: str = "configs/model_prices.json"
+    eval_results_dir: str = "evals/results"  # Stage 5 eval browser (read-only)
 
     # ---- RAG (Stage 2) ----
     upload_dir: str = "data/uploads"
