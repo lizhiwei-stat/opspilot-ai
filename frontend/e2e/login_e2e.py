@@ -21,14 +21,14 @@ import urllib.request
 
 from playwright.sync_api import expect, sync_playwright
 
-ROLE_LABEL = {"admin": "管理员", "user": "普通用户"}
+ROLE_LABEL = {"admin": "系统管理员", "support": "技术支持工程师", "user": "普通业务用户"}
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="http://localhost:5173")
     ap.add_argument("--email", required=True)
-    ap.add_argument("--expect-role", choices=["admin", "user"], required=True)
+    ap.add_argument("--expect-role", choices=["admin", "support", "user"], required=True)
     ap.add_argument("--screenshot")
     ap.add_argument("--channel", default=None, help="e.g. chrome / msedge to use a system browser")
     args = ap.parse_args()
@@ -48,9 +48,9 @@ def main() -> int:
         with page.expect_response("**/api/v1/auth/me") as me_resp:
             page.get_by_role("button", name="登录", exact=True).click()
         me = me_resp.value.json()
-        panel = page.get_by_label("auth")
-        expect(panel).to_contain_text("已登录", timeout=10_000)
-        expect(panel).to_contain_text(me["email"])
+        # Stage 5 shell: the header shows the signed-in user + role label
+        panel = page.get_by_label("当前用户")
+        expect(panel).to_contain_text(me["display_name"], timeout=10_000)
         expect(panel).to_contain_text(ROLE_LABEL[args.expect_role])
         token = page.evaluate("() => sessionStorage.getItem('opspilot.token')")
         # Cross-check the UI against the real API with the browser's own token.
@@ -62,7 +62,7 @@ def main() -> int:
         assert api_me == me, (api_me, me)
         assert me["role"] == args.expect_role, me
         page.reload()
-        expect(page.get_by_label("auth")).to_contain_text(me["email"], timeout=10_000)
+        expect(page.get_by_label("当前用户")).to_contain_text(me["display_name"], timeout=10_000)
         if args.screenshot:
             page.screenshot(path=args.screenshot, full_page=True)
         browser.close()

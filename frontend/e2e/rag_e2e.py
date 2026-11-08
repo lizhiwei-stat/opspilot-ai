@@ -48,7 +48,7 @@ def main() -> int:
         page.get_by_label("邮箱").fill(args.email)
         page.get_by_label("密码").fill(password)
         page.get_by_role("button", name="登录", exact=True).click()
-        expect(page.get_by_label("auth")).to_contain_text("已登录", timeout=10_000)
+        expect(page.get_by_label("当前用户")).to_be_visible(timeout=10_000)
 
         # knowledge bases: alice sees order-platform + public-faq, never hr-confidential
         page.get_by_role("link", name="知识库").click()
@@ -68,18 +68,18 @@ def main() -> int:
         shot(page, args.screenshots, "stage2-knowledge.png")
 
         # retrieval debug: all four modes
-        page.get_by_role("link", name="检索调试").click()
+        page.get_by_role("tab", name="检索测试").click()
         page.get_by_label("查询").fill("ERR_PAY_TIMEOUT 之后怎么重试")
         page.get_by_role("button", name="检索", exact=True).click()
         for m in ("vector", "keyword", "hybrid", "hybrid_rerank"):
             card = page.get_by_label(f"results-{m}", exact=True)
             expect(card).to_contain_text("#1", timeout=10_000)
-        expect(page.get_by_role("note")).to_contain_text("没有语义理解")
+        expect(page.get_by_role("note").filter(has_text="没有语义理解")).to_be_visible()
         checks["search_modes"] = 4
         shot(page, args.screenshots, "stage2-search-debug.png")
 
         # grounded QA with citations, then a no-answer question
-        page.get_by_role("link", name="问答").click()
+        page.get_by_role("tab", name="问答与引用").click()
         page.get_by_label("问题").fill("ORD-5003 是什么错误，怎么处理？")
         with page.expect_response("**/api/v1/qa") as qa_resp:
             page.get_by_role("button", name="提问").click()
@@ -98,7 +98,8 @@ def main() -> int:
         checks["qa_no_permission"] = "证据不足 (hr doc not visible to alice)"
 
         # evals page reads saved runs
-        page.get_by_role("link", name="评测").click()
+        page.get_by_role("link", name="评测与监控").click()
+        page.get_by_role("tab", name="RAG 评测运行（数据库）").click()
         ev = page.get_by_label("evals")
         expect(ev).to_contain_text("hybrid_rerank", timeout=10_000)
         expect(ev).to_contain_text("无语义")

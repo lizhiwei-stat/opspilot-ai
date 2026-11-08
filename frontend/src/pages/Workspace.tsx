@@ -28,6 +28,11 @@ export default function Workspace({ threadId }: { threadId?: string }) {
   const [live, setLive] = useState<Live | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
+  // stream callbacks outlive renders: always reload through the latest hook instances
+  const reloadRef = useRef({ runs, threads });
+  useEffect(() => {
+    reloadRef.current = { runs, threads };
+  });
 
   const list = runs.data ?? [];
   const sel = list.find((r) => r.run_id === selected) ?? list[list.length - 1] ?? null;
@@ -44,13 +49,12 @@ export default function Workspace({ threadId }: { threadId?: string }) {
         onState: (s) => {
           setLive((l) => (l && l.runId === runId ? { ...l, state: s, reconnects: l.reconnects + (s.kind === "reconnecting" ? 1 : 0) } : l));
           if (s.kind === "ended") {
-            void runs.reload();
-            void threads.reload();
+            void reloadRef.current.runs.reload();
+            void reloadRef.current.threads.reload();
           }
         },
       });
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [token],
   );
 

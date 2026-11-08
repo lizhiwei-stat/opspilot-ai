@@ -1,0 +1,14 @@
+# Stage 5 local production-build override (localhost only, NOT a public deployment).
+#   docker compose --env-file .env -f infra/docker-compose.yml -f infra/docker-compose.prod.yml \
+#       --profile prod up -d --build frontend_prod
+# Serves the built SPA via nginx on 127.0.0.1:${OPSPILOT_FRONTEND_PROD_PORT:-5180}; the dev
+# server (frontend, hot reload) keeps running on its own port.
+services:
+  frontend_prod:
+    profiles: ["prod"]
+    build: { context: .., dockerfile: infra/frontend.prod.Dockerfile }
+    ports: ["127.0.0.1:${OPSPILOT_FRONTEND_PROD_PORT:-5180}:8080"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    depends_on:
+      backend: { condition: service_healthy }

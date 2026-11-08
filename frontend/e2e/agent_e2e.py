@@ -32,9 +32,9 @@ def login(browser: Browser, url: str, email: str, pw: str) -> Page:
     page.get_by_label("邮箱").fill(email)
     page.get_by_label("密码").fill(pw)
     page.get_by_role("button", name="登录", exact=True).click()
-    expect(page.get_by_label("auth")).to_contain_text("已登录", timeout=10_000)
-    expect(page.locator("header")).to_contain_text("Stage 4")
-    page.get_by_role("link", name="Agent").click()
+    expect(page.get_by_label("当前用户")).to_be_visible(timeout=10_000)
+    # Stage 5: the Stage 3/4 workbench lives on at /lab/agent (Agent 调试台)
+    page.goto(url.rstrip("/") + "/lab/agent")
     return page
 
 

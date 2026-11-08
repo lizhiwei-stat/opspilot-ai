@@ -30,8 +30,11 @@ services:
       OPSPILOT_DATABASE_URL: postgresql+psycopg://${OPSPILOT_PG_USER:-opspilot}:${OPSPILOT_PG_PASSWORD:-opspilot}@postgres:5432/${OPSPILOT_PG_DB:-opspilot}
       OPSPILOT_CORS_ORIGINS: '["http://localhost:${OPSPILOT_FRONTEND_PORT:-5173}","http://127.0.0.1:${OPSPILOT_FRONTEND_PORT:-5173}"]'
     ports: ["127.0.0.1:${OPSPILOT_BACKEND_PORT:-8000}:8000"]
+      # Stage 5 eval browser reads committed result files (excluded from the image by .dockerignore)
+      OPSPILOT_EVAL_RESULTS_DIR: /app/evals/results
     volumes:
       - uploads:/app/data/uploads
+      - ../evals/results:/app/evals/results:ro
     depends_on:
       postgres: { condition: service_healthy }
     healthcheck:

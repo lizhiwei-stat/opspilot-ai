@@ -239,6 +239,7 @@ function Drafts() {
   const { token, can } = useAuth();
   const [status, setStatus] = useState("pending_approval");
   const drafts = useAsync(() => platform.drafts(token, status || undefined), [token, status]);
+  const [notice, setNotice] = useState<string | null>(null);
   return (
     <Card
       title="工单草稿"
@@ -255,25 +256,36 @@ function Drafts() {
       }
     >
       {!can("admin") && <p className="mb-3 text-xs text-slate-500">审批仅限系统管理员；你可以查看草稿状态与审批记录。</p>}
+      {notice && (
+        <p role="status" aria-label="审批结果" className="mb-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {notice}
+        </p>
+      )}
       <ErrorText error={drafts.error} />
       {drafts.loading && !drafts.data && <Loading />}
       {drafts.data?.length === 0 && <EmptyState title="没有该状态的草稿" />}
       <ul className="space-y-3">
         {drafts.data?.map((d) => (
-          <DraftItem key={d.draft_id} d={d} onDone={() => void drafts.reload()} />
+          <DraftItem
+            key={d.draft_id}
+            d={d}
+            onDone={(msg) => {
+              setNotice(msg);
+              void drafts.reload();
+            }}
+          />
         ))}
       </ul>
     </Card>
   );
 }
 
-function DraftItem({ d, onDone }: { d: DraftRow; onDone: () => void }) {
+function DraftItem({ d, onDone }: { d: DraftRow; onDone: (msg: string) => void }) {
   const { token, can } = useAuth();
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<Decision | null>(null);
-  const [result, setResult] = useState<string | null>(null);
 
   async function decide(decision: Decision) {
     setConfirm(null);
@@ -283,8 +295,8 @@ function DraftItem({ d, onDone }: { d: DraftRow; onDone: () => void }) {
     setError(null);
     try {
       const r = await agent.approve(token, d.run_id, decision, comment.trim());
-      setResult(r.draft_result?.ticket_number ? `已批准并创建工单 ${r.draft_result.ticket_number}` : `已提交：${decision}`);
-      onDone();
+      const label = { approved: "已批准", rejected: "已拒绝", returned: "已退回修改" }[decision];
+      onDone(r.draft_result?.ticket_number ? `「${d.title}」${label}并创建工单 ${r.draft_result.ticket_number}` : `「${d.title}」${label}`);
     } catch (e) {
       setError(errText(e));
     } finally {
@@ -318,8 +330,7 @@ function DraftItem({ d, onDone }: { d: DraftRow; onDone: () => void }) {
           审批记录：{d.approval.decision} · {d.approval.reviewer} · {when(d.approval.decided_at)} {d.approval.comment && `· “${d.approval.comment}”`}
         </p>
       )}
-      {result && <p className="mt-2 text-xs text-emerald-700" aria-label="审批结果">{result}</p>}
-      {can("admin") && d.status === "pending_approval" && !result && (
+      {can("admin") && d.status === "pending_approval" && (
         <div className="mt-3 space-y-2">
           <input aria-label="审批意见" className={`${input} w-full`} placeholder="审批意见（退回修改时必填）" maxLength={500} value={comment} onChange={(e) => setComment(e.target.value)} />
           <div className="flex flex-wrap gap-2">

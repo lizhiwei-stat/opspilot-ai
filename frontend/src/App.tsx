@@ -28,7 +28,7 @@ export const NAV: NavItem[] = [
   { to: "/evals", label: "评测与监控", icon: "◔" },
   { to: "/admin/users", label: "用户与权限", icon: "⚑", roles: ["admin"] },
   { to: "/admin/settings", label: "系统设置", icon: "⚙", roles: ["admin"] },
-  { to: "/lab/agent", label: "Agent 调试台(Stage4)", icon: "⌁", roles: ["admin"] },
+  { to: "/lab/agent", label: "Agent 调试台", icon: "⌁" },
 ];
 
 // Stage <=4 used hash tabs; keep old bookmarks working.

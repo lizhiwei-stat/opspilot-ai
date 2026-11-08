@@ -102,7 +102,7 @@ describe("Tickets", () => {
     fireEvent.click(screen.getByRole("button", { name: "取消" }));
     expect(calls.some((c) => c.includes("/approval"))).toBe(false);
     fireEvent.click(within(item).getByRole("button", { name: "批准" }));
-    expect(await within(item).findByText("已批准并创建工单 TCK-0010")).toBeTruthy();
+    expect((await screen.findByLabelText("审批结果")).textContent).toContain("已批准并创建工单 TCK-0010");
     expect(calls.find((c) => c.includes("/approval"))).toContain('"decision":"approved"');
   });
 });

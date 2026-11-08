@@ -115,7 +115,7 @@ function RunView({ runId }: { runId: string }) {
           ) : (
             <ol className="max-h-80 space-y-1 overflow-auto font-mono text-[11px]">
               {events.map((e) => (
-                <li key={e.seq}>
+                <li key={e.seq} className="truncate" title={JSON.stringify(e.data)}>
                   <span className="text-slate-400">#{e.seq}</span> {e.type} <span className="text-slate-500">{JSON.stringify(e.data).slice(0, 120)}</span>
                 </li>
               ))}
