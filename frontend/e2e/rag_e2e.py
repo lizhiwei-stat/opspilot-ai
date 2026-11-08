@@ -57,8 +57,10 @@ def main() -> int:
         expect(kb_list).to_contain_text("公共 FAQ")
         expect(kb_list).not_to_contain_text("人力资源")
         checks["kb_acl"] = "order-platform+public-faq visible, hr-confidential hidden"
+        # select explicitly: other public KBs (e.g. left by stage5 e2e) may sort first
+        kb_list.get_by_role("button").filter(has_text="订单平台技术文档").first.click()
         docs = page.get_by_label("documents")
-        expect(docs).to_contain_text("deployment-rollback-guide.pdf")
+        expect(docs).to_contain_text("deployment-rollback-guide.pdf", timeout=10_000)
         expect(docs).to_contain_text("只读")  # alice has read-only grant
         docs.get_by_role("button", name="deployment-rollback-guide.pdf").click()
         viewer = page.get_by_label("chunk-viewer")
