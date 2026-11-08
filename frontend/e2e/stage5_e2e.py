@@ -223,8 +223,13 @@ def main() -> int:
         R.checks["user_agent_run"] = {
             "question_code": code,
             "evidence_from_uploaded_doc": True,
-            "mcp_tools": ["search_knowledge", "analyze_error_code", "query_system_logs",
-                          "get_service_status", "create_ticket_draft"],
+            "mcp_tools": [
+                "search_knowledge",
+                "analyze_error_code",
+                "query_system_logs",
+                "get_service_status",
+                "create_ticket_draft",
+            ],
             "status": "awaiting_approval",
         }
         R.shot(page, "s5_workspace_pending.png")
