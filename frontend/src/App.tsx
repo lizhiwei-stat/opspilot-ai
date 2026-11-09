@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import EvalCenter from "./pages/EvalCenter";
 import Executions from "./pages/Executions";
 import KnowledgeCenter from "./pages/KnowledgeCenter";
+import Observability from "./pages/Observability";
 import Settings from "./pages/Settings";
 import Tickets from "./pages/Tickets";
 import Workspace from "./pages/Workspace";
@@ -27,6 +28,7 @@ export const NAV: NavItem[] = [
   { to: "/executions", label: "执行可视化", icon: "⇢" },
   { to: "/evals", label: "评测与监控", icon: "◔" },
   { to: "/admin/users", label: "用户与权限", icon: "⚑", roles: ["admin"] },
+  { to: "/admin/observability", label: "可观测性", icon: "◎", roles: ["admin"] },
   { to: "/admin/settings", label: "系统设置", icon: "⚙", roles: ["admin"] },
   { to: "/lab/agent", label: "Agent 调试台", icon: "⌁" },
 ];
@@ -93,6 +95,7 @@ function route(pathname: string, path: string): ReactNode {
   if ((m = match("/executions/:runId", pathname))) return <Executions runId={m.runId} />;
   if (pathname === "/evals") return <EvalCenter tab={query(path).get("tab") ?? "results"} />;
   if (pathname === "/admin/users") return <AdminUsers />;
+  if (pathname === "/admin/observability") return <Observability />;
   if (pathname === "/admin/settings") return <Settings />;
   if (pathname === "/lab/agent") return <LegacyAgent />;
   return (
@@ -129,7 +132,7 @@ function Layout({ pathname, children }: { pathname: string; children: ReactNode 
   const items = NAV.filter((n) => !n.roles || s.can(...n.roles));
   const active = (to: string) => (to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`));
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 lg:flex">
+    <div className="min-h-screen bg-slate-50 text-slate-800 lg:flex lg:h-screen lg:overflow-hidden">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:p-2">
         跳到主要内容
       </a>
@@ -164,7 +167,7 @@ function Layout({ pathname, children }: { pathname: string; children: ReactNode 
           </p>
         )}
       </aside>
-      <div className="min-w-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:px-8">
           <button className={`${btn} lg:hidden`} aria-label="切换导航" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
             ☰
@@ -184,7 +187,7 @@ function Layout({ pathname, children }: { pathname: string; children: ReactNode 
             </button>
           </div>
         </header>
-        <main id="main" className="mx-auto max-w-7xl px-4 py-6 lg:px-8">
+        <main id="main" className="mx-auto w-full max-w-7xl flex-1 overflow-auto px-4 py-6 lg:px-8">
           {children}
         </main>
       </div>

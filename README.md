@@ -3,7 +3,7 @@
 > Production-oriented AI Support & Ticket Resolution Platform
 > 面向软件企业技术支持 / 研发 / 客服团队的智能技术支持 Agent 平台：查文档、查日志、给出有出处的故障建议、生成待审工单，人工审批后才落库。
 
-**当前进度：阶段 5（企业级 Web 平台，Mock 模型）已完成，在 WSL2 + Docker Compose + Windows Edge 上实测（tag `stage-5`）** —— 详见 [阶段 5 报告](docs/reports/STAGE5_REPORT.md)、[页面地图](docs/PAGE_MAP.md)、[阶段 5 API](docs/API_STAGE5.md)、[演示脚本](docs/DEMO_SCRIPT.md)、[docs/PROGRESS.md](docs/PROGRESS.md)。
+**当前进度：阶段 6（生产工程 / 评测 / 可观测 / 安全与本地 CI，Mock）已完成（tag `stage-6`）** —— 详见 [阶段 6 报告](docs/reports/STAGE6_REPORT.md)、[负载](docs/reports/STAGE6_LOAD.md)、[安全](docs/reports/STAGE6_SECURITY.md)、[Qwen 对照计划（未执行）](docs/STAGE6_QWEN_COMPARE_PLAN.md)、[运维手册](docs/OPS_RUNBOOK.md)、[ADR-005](docs/adr/ADR-005-stage6-engineering.md)。
 工具经真实 MCP 协议（官方 SDK mcp 2.3，stdio 子进程）调用；审批通过后才由 Ticket MCP 创建正式工单。Agent 默认 Mock（规则 + 抽取式，未调用大模型）；阶段 4 的真实 Qwen 测试待授权（[预算方案](docs/STAGE4_QWEN_BUDGET_PLAN.md)）。README 只写已经验证过的内容。
 
 > ⚠️ 默认 **Mock 模式**：mock embedding 是特征哈希的字/词袋向量，**没有语义理解**；mock 回答器是**抽取式**的（摘录原文 + 引用），**没有调用大模型**。界面和接口都明确标注了这一点。阶段 2.5 起可选**免费本地 CPU 模型**（bge-small-zh-v1.5 / bge-m3 embedding、bge-reranker-base 重排），已实测；真实 DashScope / Qwen 付费路径有多重守卫，**尚未运行**（[方案待批准](docs/STAGE2_5_PAID_EMBED_PLAN.md)）。
@@ -100,6 +100,10 @@ cd frontend && npm ci && npm run dev      # :5173，需要 Node 22
 **免费本地模型（阶段 2.5，CPU，不需要 Key）**：`uv sync --group local-embed`（装 torch CPU 版约 1 GB；注意 `--all-groups` 也会装它），设置 `OPSPILOT_EMBEDDING_PROVIDER=local`（默认 bge-small-zh-v1.5，固定 revision），可选 `OPSPILOT_RERANKER=cross_encoder`（约 2 秒/查询）。首次下载模型后可设 `HF_HUB_OFFLINE=1`。每个 embedding 模型有独立索引，切换模型不会删除或混用旧向量，需对文档「重建索引」。
 本地评测：`uv run --group local-embed python evals/run_retrieval_eval.py --embedding local --dataset dev|heldout --rerankers rule,cross_encoder`。
 **付费路径**（`--embedding dashscope --i-understand-this-costs-money`）另需 `OPSPILOT_ALLOW_PAID_API=true`、`OPSPILOT_PAID_APPROVAL_ID`、`OPSPILOT_PAID_BUDGET_CNY`，超出预算在发请求前拒绝；**尚未运行**。
+
+## 阶段 6：工程化
+- Agent 评测 ≥100 场景（冻结 final_test）· 可观测性页 + `/metrics` · 负载脚本 · 安全矩阵 · `scripts/run_ci_local.sh` · 备份恢复演示
+- 真实 Qwen 对照：**未执行**，见预算计划
 
 ## 阶段 5：Web 平台
 | 地址 | 说明 |

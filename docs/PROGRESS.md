@@ -10,7 +10,7 @@
 | 3 | LangGraph StateGraph Agent（15 节点）、5 个受控工具、超时/重试/降级、证据评估与拒答、HITL 审批（interrupt）、PostgresSaver 持久化与恢复、Agent 工作台、41 场景 Mock 评测、401 根因修复 | ✅ 完成（2026-11-02，Mock），等待验收；真实 Qwen 测试待授权 | [STAGE3_REPORT](reports/STAGE3_REPORT.md) · [Qwen 方案](STAGE3_QWEN_TEST_PLAN.md) · [ADR-003](adr/ADR-003-stage3-agent.md) | `stage-3` |
 | 4 | 三个真实 MCP Server（官方 SDK mcp 2.3，stdio + 可选加固 HTTP）、LangGraph ↔ MCP 集成、ORD-5003 事件 → 草稿 → 审批（批准 / 驳回 / 退回修改 / 过期 / 重启恢复）→ Ticket MCP 建单、调用者令牌与工具安全、审计表（迁移 0005）、前端审批队列、Edge E2E、Notebook | ✅ 完成（2026-11-02，Mock），等待验收；真实 Qwen 测试待授权 | [STAGE4_REPORT](reports/STAGE4_REPORT.md) · [ADR-004](adr/ADR-004-stage4-mcp.md) · [预算方案](STAGE4_QWEN_BUDGET_PLAN.md) | `stage-4` |
 | 5 | 企业级 Web 平台：History 路由 SaaS 外壳、三角色权限、仪表盘（真实数据）、SSE 智能体工作台（断线续传、取消、恢复）、知识库与授权管理、工单中心与审批、执行可视化、评测与监控、用户管理（最后管理员保护）、系统设置、生产 nginx 构建、Edge E2E（开发 + 生产） | ✅ 完成（2026-11-08，Mock），等待验收 | [STAGE5_REPORT](reports/STAGE5_REPORT.md) · [页面地图](PAGE_MAP.md) · [API](API_STAGE5.md) · [演示脚本](DEMO_SCRIPT.md) | `stage-5` |
-| 6 | 评测体系、安全测试、CI、Docker 集成、文档 | ⏳ 未开始（CI 骨架已有，未在 GitHub 运行） | — | — |
+| 6 | 生产工程：架构审查（无 K8s/Redis）、Agent 评测≥100（冻结集）、轻量可观测、Mock 负载、安全矩阵、本地 CI、备份恢复、KB 删除与滚动修复 | ✅ 完成（2026-11-09，Mock），等待验收；真实 Qwen 对照待授权 | [STAGE6_REPORT](reports/STAGE6_REPORT.md) · [LOAD](reports/STAGE6_LOAD.md) · [SECURITY](reports/STAGE6_SECURITY.md) · [Qwen 计划](STAGE6_QWEN_COMPARE_PLAN.md) · [ADR-005](adr/ADR-005-stage6-engineering.md) | `stage-6` |
 
-## 第六阶段前仍需处理
-见 [STAGE5_REPORT §3](reports/STAGE5_REPORT.md#3-尚未验证--未完成)。
+## 验收后可选
+真实 Qwen 对照（[计划](STAGE6_QWEN_COMPARE_PLAN.md)）· 远端 CI push · 合成评测期望校准。

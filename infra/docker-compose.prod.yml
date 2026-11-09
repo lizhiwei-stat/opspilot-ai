@@ -5,6 +5,8 @@
 # server (frontend, hot reload) keeps running on its own port.
 services:
   frontend_prod:
+    stop_grace_period: 15s
+    restart: unless-stopped
     profiles: ["prod"]
     build: { context: .., dockerfile: infra/frontend.prod.Dockerfile }
     ports: ["127.0.0.1:${OPSPILOT_FRONTEND_PROD_PORT:-5180}:8080"]

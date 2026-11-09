@@ -113,7 +113,12 @@ def run_scenario(sc: dict, base: Settings, sf: Any, pool: Any, users: dict, prov
         llm_faults=sc.get("llm_faults"),
     )
     user = users[sc["user"]]
-    turns = sc.get("turns") or [sc["question"]]
+    if sc.get("approval") and "approve" not in sc:
+        sc = {**sc, "approve": sc["approval"].get("decision", "approved")}
+    turns = list(sc.get("turns") or [sc["question"]])
+    if sc.get("followup") and isinstance(sc["followup"], dict) and sc["followup"].get("question"):
+        # multi-turn: run first question; follow-up handled after approval/resume below via turns append
+        pass
     views, errors = [], []
     thread = None
     t0 = time.perf_counter()
@@ -177,15 +182,29 @@ def evaluate(sc: dict, res: dict, sf: Any) -> dict:
     checks: dict[str, bool] = {}
     if "status" in exp:
         checks["status"] = last.get("status") == exp["status"]
+    if "status_in" in exp:
+        checks["status_in"] = last.get("status") in exp["status_in"]
     if "final_status" in exp:
         checks["final_status"] = last.get("final_status") == exp["final_status"]
+    if "final_status_in" in exp:
+        checks["final_status_in"] = last.get("final_status") in exp["final_status_in"]
     if "tools" in exp:
         checks["tools"] = exec_names == sorted(set(exp["tools"]))
+    if "tools_any" in exp:
+        want = set(exp["tools_any"])
+        checks["tools_any"] = bool(want & set(exec_names)) or (not want and not exec_names)
     ans = "\n".join(v.get("answer") or "" for v in views[-1:])
     for w in exp.get("answer_contains", []):
         checks[f"contains:{w}"] = w in ans
+    if exp.get("answer_contains_any"):
+        checks["contains_any"] = any(w in ans for w in exp["answer_contains_any"])
     for w in exp.get("answer_not_contains", []):
         checks[f"not_contains:{w}"] = w not in ans
+    for w in exp.get("answer_forbids", []):
+        checks[f"forbids:{w}"] = w.lower() not in ans.lower()
+    if "min_citations" in exp:
+        cites = last.get("citations") or []
+        checks["min_citations"] = len(cites) >= int(exp["min_citations"])
     forbidden_exec = [
         t for t in executed if t["tool"] in exp.get("forbid_executed", []) and t["status"] == "ok"
     ]
@@ -222,6 +241,8 @@ def evaluate(sc: dict, res: dict, sf: Any) -> dict:
     return {
         "id": sc["id"],
         "category": sc["category"],
+        "taxonomy": sc.get("taxonomy") or sc["category"],
+        "split": sc.get("split"),
         "user": sc["user"],
         "question": sc.get("question") or " / ".join(sc.get("turns", [])),
         "passed": all(checks.values())
@@ -293,13 +314,58 @@ def metrics(rows: list[dict]) -> dict:
         "avg_tool_calls": round(calls / n, 3),
         "latency_ms_p50": pct(lat, 50),
         "latency_ms_p95": pct(lat, 95),
+        "latency_ms_p99": pct(lat, 99),
         "tokens_in": sum(r["tokens_in"] for r in rows),
         "tokens_out": sum(r["tokens_out"] for r in rows),
         "cost_cny": round(sum(r["cost_cny"] for r in rows), 6),
+        "cost_cny_per_task": round(sum(r["cost_cny"] for r in rows) / n, 6) if n else None,
+        "answer_groundedness": round(
+            sum(r["answered_supported"] for r in answered) / len(answered), 4
+        )
+        if answered
+        else None,
+        "abstention_accuracy": round(sum(r["refused"] for r in exp_ref) / len(exp_ref), 4)
+        if exp_ref
+        else None,
         "by_category": {
             c: f"{sum(r['passed'] for r in rows if r['category'] == c)}/{sum(1 for r in rows if r['category'] == c)}"
             for c in sorted({r["category"] for r in rows})
         },
+        "by_taxonomy": {
+            c: f"{sum(r['passed'] for r in rows if r.get('taxonomy') == c)}/{sum(1 for r in rows if r.get('taxonomy') == c)}"
+            for c in sorted({r.get("taxonomy") for r in rows if r.get("taxonomy")})
+        },
+        "failures": [
+            {
+                "id": r["id"],
+                "taxonomy": r.get("taxonomy"),
+                "category": r["category"],
+                "failed_checks": [k for k, v in r["checks"].items() if not v],
+                "errors": r["errors"],
+                "status": r["status"],
+                "root_cause_hint": (
+                    "tool_selection"
+                    if any(k.startswith("tools") for k, v in r["checks"].items() if not v)
+                    else "content"
+                    if any(
+                        k.startswith(("contains", "forbids", "not_contains"))
+                        for k, v in r["checks"].items()
+                        if not v
+                    )
+                    else "status"
+                    if any(
+                        k.startswith(("status", "final_status"))
+                        for k, v in r["checks"].items()
+                        if not v
+                    )
+                    else "runtime_error"
+                    if r["errors"]
+                    else "other"
+                ),
+            }
+            for r in rows
+            if not r["passed"]
+        ],
     }
 
 
@@ -310,6 +376,13 @@ def main() -> int:
     ap.add_argument("--provider", default="mock", choices=["mock", "qwen"])
     ap.add_argument("--tag", default="agent_mock")
     ap.add_argument("--only", help="comma separated scenario ids")
+    ap.add_argument("--dataset", default=str(DATASET), help="jsonl dataset path")
+    ap.add_argument("--split", default="all", choices=["all", "dev", "validation", "final_test"])
+    ap.add_argument(
+        "--verify-hash",
+        action="store_true",
+        help="verify dataset against evals/agent/FROZEN_v2.sha256",
+    )
     a = ap.parse_args()
     s = get_settings()
     url = (
@@ -326,9 +399,22 @@ def main() -> int:
         )
     if a.prepare:
         prepare(s)
+    ds_path = Path(a.dataset)
+    if not ds_path.is_absolute():
+        ds_path = ROOT / ds_path if not ds_path.exists() else ds_path
+    if a.verify_hash and ds_path.name.startswith("agent_eval_v2"):
+        import hashlib
+
+        frozen = (ROOT / "evals/agent/FROZEN_v2.sha256").read_text().splitlines()
+        digest = hashlib.sha256(ds_path.read_bytes()).hexdigest()
+        ok = any(line.startswith(digest) and ds_path.name in line for line in frozen)
+        if not ok:
+            raise SystemExit(f"dataset hash mismatch for {ds_path.name}: {digest}")
     scenarios = [
-        json.loads(x) for x in DATASET.read_text(encoding="utf-8").splitlines() if x.strip()
+        json.loads(x) for x in ds_path.read_text(encoding="utf-8").splitlines() if x.strip()
     ]
+    if a.split != "all":
+        scenarios = [x for x in scenarios if x.get("split") == a.split]
     if a.only:
         keep = set(a.only.split(","))
         scenarios = [x for x in scenarios if x["id"] in keep]
@@ -344,7 +430,7 @@ def main() -> int:
             rows.append(evaluate(sc, res, sf))
             r = rows[-1]
             print(
-                f"{r['id']} {r['category']:16} {'PASS' if r['passed'] else 'FAIL'} "
+                f"{r['id']} {(r.get('taxonomy') or r['category']):16} {'PASS' if r['passed'] else 'FAIL'} "
                 f"status={r['status']}/{r['final_status']} tools={r['tools_executed']}"
                 + (
                     ""
@@ -362,7 +448,10 @@ def main() -> int:
         "disclaimer": DISCLAIMER if a.provider == "mock" else None,
         "provider": a.provider,
         "model": "mock-agent-v1" if a.provider == "mock" else s.agent_llm_model,
-        "dataset": str(DATASET.relative_to(ROOT)),
+        "dataset": str(ds_path.relative_to(ROOT))
+        if str(ds_path).startswith(str(ROOT))
+        else str(ds_path),
+        "split": a.split,
         "tool_transport": "mcp-stdio" if s.agent_tool_transport == "mcp" else "inprocess",
         "generated_at": ts,
         "metrics": m,

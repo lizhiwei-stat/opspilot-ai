@@ -1,7 +1,10 @@
 name: ci
+# Local verification: scripts/run_ci_local.sh
+# Remote GitHub Actions runs only after an explicit push authorization (Stage 6: prepare only).
 on:
   push:
   pull_request:
+  workflow_dispatch:
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -15,13 +18,22 @@ jobs:
     env:
       OPSPILOT_TEST_DATABASE_URL: postgresql+psycopg://opspilot:opspilot@localhost:5432/opspilot_test
       OPSPILOT_REQUIRE_DB: "1"
+      OPSPILOT_LLM_PROVIDER: mock
+      OPSPILOT_EMBEDDING_PROVIDER: mock
+      OPSPILOT_AGENT_LLM_PROVIDER: mock
+      OPSPILOT_ALLOW_PAID_API: "false"
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10
         with: { version: "0.13.5" }
-      - run: uv sync --frozen -p 3.11
+      - run: uv sync --frozen -p 3.11 --group dev
       - run: uv run ruff check . && uv run ruff format --check .
-      - run: uv run pytest -v
+      - run: uv run alembic -c alembic.ini heads
+      - run: uv run pytest -q
+      - name: dependency audit (pip)
+        run: |
+          uv pip install pip-audit
+          uv run pip-audit --progress-spinner off || true
   frontend:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: frontend } }
@@ -30,5 +42,19 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
       - run: npm ci
-      - run: npm run build
+      - run: npm run lint
+      - run: npx tsc --noEmit -p .
       - run: npm test
+      - run: npm run build
+      - name: npm audit
+        run: npm audit --audit-level=high || true
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build backend + prod frontend images
+        run: |
+          docker build -f infra/backend.Dockerfile -t opspilot-backend:ci .
+          docker build -f infra/frontend.prod.Dockerfile -t opspilot-frontend-prod:ci .
+          docker image inspect opspilot-backend:ci --format 'backend={{.Size}}'
+          docker image inspect opspilot-frontend-prod:ci --format 'frontend_prod={{.Size}}'

@@ -115,15 +115,15 @@ export default function Workspace({ threadId }: { threadId?: string }) {
   const lastNode = liveNodes[liveNodes.length - 1]?.node ?? null;
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[16rem_1fr_24rem]">
-      <aside aria-label="会话列表" className="space-y-2">
-        <button className={`${btnPrimary} w-full`} onClick={() => navigate("/workspace")}>
+    <div className="grid h-[calc(100vh-7rem)] gap-4 xl:grid-cols-[16rem_1fr_24rem]">
+      <aside aria-label="会话列表" className="flex min-h-0 flex-col space-y-2">
+        <button className={`${btnPrimary} w-full shrink-0`} onClick={() => navigate("/workspace")}>
           ＋ 新建会话
         </button>
         {threads.loading && !threads.data && <Loading />}
         <ErrorText error={threads.error} />
         {threads.data?.length === 0 && <EmptyState title="暂无历史会话" />}
-        <ul className="space-y-1">
+        <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
           {threads.data?.map((t) => (
             <li key={t.thread_id}>
               <Link
@@ -141,14 +141,14 @@ export default function Workspace({ threadId }: { threadId?: string }) {
         </ul>
       </aside>
 
-      <section className="min-w-0 space-y-4" aria-label="对话">
+      <section className="flex min-h-0 min-w-0 flex-col space-y-3" aria-label="对话">
         <MockNotice>
           流式说明：这里推送的是<strong>节点 / 工具 / 证据级事件</strong>（SSE，可断线续传），最终回答在运行结束后一次性返回；不是逐 token 流式输出，也不展示模型的私有推理过程。
         </MockNotice>
         <ErrorText error={error ?? runs.error} />
         {!threadId && list.length === 0 && <EmptyState title="开始一个新会话" hint="例如：ORD-5003 是什么错误？或：订单超时影响下单，帮我创建一个工单" />}
         {runs.loading && threadId && !runs.data && <Loading />}
-        <ol className="space-y-4" aria-label="消息">
+        <ol className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1" aria-label="消息">
           {list.map((r) => (
             <li key={r.run_id} className="space-y-2">
               <div className="flex justify-end">
@@ -194,7 +194,7 @@ export default function Workspace({ threadId }: { threadId?: string }) {
             </li>
           ))}
         </ol>
-        <form onSubmit={submit} noValidate className="sticky bottom-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+        <form onSubmit={submit} noValidate className="shrink-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
           <label htmlFor="ask" className="sr-only">
             输入问题
           </label>
@@ -229,7 +229,7 @@ export default function Workspace({ threadId }: { threadId?: string }) {
         </form>
       </section>
 
-      <aside className="min-w-0 space-y-4" aria-label="执行详情">
+      <aside className="min-h-0 min-w-0 space-y-4 overflow-y-auto" aria-label="执行详情">
         <Card
           title="实时事件流"
           label="event-stream"

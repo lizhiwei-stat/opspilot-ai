@@ -1,0 +1,107 @@
+{
+  "IS_MOCK": true,
+  "disclaimer": "Mock-only load/reliability. Not a production capacity claim.",
+  "base": "http://127.0.0.1:18020",
+  "started_at": "2026-11-09T03:47:39.223180+00:00",
+  "env": {
+    "concurrency": 8,
+    "requests": 40,
+    "python": "3.11.17"
+  },
+  "checks": {
+    "single_user_dashboard": {
+      "name": "single_user_dashboard",
+      "n": 20,
+      "success": 20,
+      "success_rate": 1.0,
+      "latency_ms": {
+        "p50": 5.4,
+        "p95": 6.7,
+        "p99": 58.0,
+        "max": 58.0,
+        "mean": 7.9
+      },
+      "errors": []
+    },
+    "concurrent_health_ready": {
+      "name": "concurrent_health_ready",
+      "n": 40,
+      "success": 40,
+      "success_rate": 1.0,
+      "latency_ms": {
+        "p50": 14.0,
+        "p95": 24.9,
+        "p99": 28.4,
+        "max": 28.4,
+        "mean": 14.5
+      },
+      "errors": []
+    },
+    "rag_search_hybrid": {
+      "name": "rag_search_hybrid",
+      "n": 15,
+      "success": 15,
+      "success_rate": 1.0,
+      "latency_ms": {
+        "p50": 8.8,
+        "p95": 12.9,
+        "p99": 378.5,
+        "max": 378.5,
+        "mean": 33.8
+      },
+      "errors": []
+    },
+    "agent_runs_sync": {
+      "name": "agent_runs_sync",
+      "n": 3,
+      "success": 3,
+      "success_rate": 1.0,
+      "latency_ms": {
+        "p50": 73.4,
+        "p95": 2704.7,
+        "p99": 2704.7,
+        "max": 2704.7,
+        "mean": 936.1
+      },
+      "errors": []
+    },
+    "sse_disconnect": {
+      "name": "sse_disconnect",
+      "n": 1,
+      "success": 1,
+      "success_rate": 1.0,
+      "latency_ms": {
+        "p50": 16.7,
+        "p95": 16.7,
+        "p99": 16.7,
+        "max": 16.7,
+        "mean": 16.7
+      },
+      "errors": []
+    }
+  },
+  "misses": [
+    "MCP hard-kill / brief PG outage: covered by fault-injection eval + ops runbook, not this HTTP harness (shared stack).",
+    "DB pool exhaustion: not forced against the shared main database."
+  ],
+  "version": {
+    "name": "OpsPilot AI",
+    "version": "0.6.0",
+    "stage": 6,
+    "env": "dev",
+    "llm_provider": "mock",
+    "llm_model": "mock-llm-v1",
+    "embedding_provider": "mock",
+    "embedding_model": "mock-hash-embedding-v1",
+    "embedding_dim": 1024,
+    "rag": {
+      "chunk_size": 500,
+      "chunk_overlap": 80,
+      "rrf_k": 60,
+      "reranker": "rule",
+      "hnsw_iterative_scan": "relaxed_order",
+      "qa_min_evidence": 0.25
+    }
+  },
+  "finished_at": "2026-11-09T03:47:43.003504+00:00"
+}

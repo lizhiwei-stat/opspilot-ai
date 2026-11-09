@@ -1,4 +1,4 @@
 """OpsPilot AI backend package."""
 
-__version__ = "0.5.0"
-STAGE = 5
+__version__ = "0.6.0"
+STAGE = 6

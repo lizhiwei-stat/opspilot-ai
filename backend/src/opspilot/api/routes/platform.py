@@ -13,7 +13,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import case, delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from opspilot import STAGE, __version__
@@ -24,8 +24,11 @@ from opspilot.db.models import (
     AdminAudit,
     AgentRun,
     Approval,
+    Chunk,
+    Document,
     KbPermission,
     KnowledgeBase,
+    McpToolAudit,
     Ticket,
     TicketDraft,
     TicketEvent,
@@ -625,6 +628,97 @@ def put_kb_permissions(
     kb.visibility = body.visibility
     db.commit()
     return kb_permissions(kb_id, user, db)
+
+
+class KbDeleteIn(BaseModel):
+    confirm_slug: str = Field(min_length=2, max_length=64)
+
+
+@router.delete("/knowledge-bases/{kb_id}")
+def delete_kb(kb_id: uuid.UUID, body: KbDeleteIn, user: CurrentUser, db: DbDep) -> dict[str, Any]:
+    """Delete a knowledge base after the caller types its slug. Owner or system admin only.
+
+    Soft-deletes documents, hard-deletes chunks/embeddings (CASCADE), then removes the KB row
+    (permissions CASCADE). Seed corpora can be deleted the same way — restore from backup if needed.
+    """
+    kb = db.get(KnowledgeBase, kb_id)
+    if kb is None:
+        raise NotFoundError("knowledge base not found")
+    if body.confirm_slug != kb.slug:
+        raise ConflictError("confirm_slug must exactly match the knowledge base slug")
+    if user.role != "admin" and kb.owner_id != user.id:
+        raise ForbiddenError("only the owner or a system admin can delete a knowledge base")
+    # remove vector/index rows first (explicit, so we can report counts)
+    n_chunks = db.execute(delete(Chunk).where(Chunk.kb_id == kb.id)).rowcount or 0
+    n_docs = 0
+    for doc in db.scalars(select(Document).where(Document.kb_id == kb.id)):
+        doc.status = "deleted"
+        n_docs += 1
+    db.flush()
+    slug, name = kb.slug, kb.name
+    db.execute(delete(KnowledgeBase).where(KnowledgeBase.id == kb.id))
+    _audit(
+        db,
+        user,
+        "kb.delete",
+        "knowledge_base",
+        kb_id,
+        slug=slug,
+        name=name,
+        documents=n_docs,
+        chunks_removed=n_chunks,
+    )
+    db.commit()
+    return {"status": "deleted", "slug": slug, "documents": n_docs, "chunks_removed": n_chunks}
+
+
+@router.get("/admin/observability")
+def admin_observability(user: AdminDep, db: DbDep) -> dict[str, Any]:
+    """Live in-process spans/counters + durable DB summaries for admin UI."""
+    from opspilot.core.tracing import snapshot
+
+    snap = snapshot(limit=80)
+    # durable last-hour MCP + agent stats
+    since = datetime.now(UTC) - timedelta(hours=1)
+    runs_1h = (
+        db.scalar(select(func.count()).select_from(AgentRun).where(AgentRun.created_at >= since))
+        or 0
+    )
+    mcp_1h = (
+        db.scalar(
+            select(func.count()).select_from(McpToolAudit).where(McpToolAudit.created_at >= since)
+        )
+        or 0
+    )
+    mcp_err = (
+        db.scalar(
+            select(func.count())
+            .select_from(McpToolAudit)
+            .where(McpToolAudit.created_at >= since, McpToolAudit.status != "ok")
+        )
+        or 0
+    )
+    recent_runs = [
+        {
+            "run_id": str(r.id),
+            "thread_id": str(r.thread_id) if r.thread_id else None,
+            "status": r.status,
+            "latency_ms": r.latency_ms,
+            "is_mock": r.is_mock,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in db.scalars(select(AgentRun).order_by(AgentRun.created_at.desc()).limit(20))
+    ]
+    return {
+        **snap,
+        "durable": {
+            "agent_runs_last_hour": runs_1h,
+            "mcp_calls_last_hour": mcp_1h,
+            "mcp_errors_last_hour": mcp_err,
+            "recent_runs": recent_runs,
+        },
+        "viewer": {"email": user.email, "role": user.role},
+    }
 
 
 # ============================================================== eval results (files + DB)

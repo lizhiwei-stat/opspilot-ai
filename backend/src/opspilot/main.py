@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import sessionmaker
 
 from opspilot import __version__
@@ -16,6 +17,7 @@ from opspilot.core.errors import register_error_handlers
 from opspilot.core.logging import configure_logging, get_logger
 from opspilot.core.middleware import RequestContextMiddleware
 from opspilot.core.redact import register_secret
+from opspilot.core.tracing import prometheus_text
 from opspilot.db.session import build_engine
 from opspilot.llm.factory import build_embedding_or_degraded, build_llm
 from opspilot.services.health import HealthService
@@ -69,11 +71,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_origins=settings.cors_origins,
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
-        expose_headers=["X-Request-ID"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-Trace-ID"],
+        expose_headers=["X-Request-ID", "X-Trace-ID"],
     )
     app.add_middleware(RequestContextMiddleware)
     register_error_handlers(app)
+
+    @app.get("/metrics", include_in_schema=False)
+    def _metrics() -> PlainTextResponse:
+        return PlainTextResponse(
+            prometheus_text(), media_type="text/plain; version=0.0.4; charset=utf-8"
+        )
+
     for r in (
         health.router,
         system.router,

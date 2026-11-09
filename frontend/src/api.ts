@@ -525,6 +525,42 @@ export interface SettingsView {
   };
   health: Readiness;
 }
+export interface ObservabilityView {
+  counters: Record<string, number>;
+  latency_ms: Record<
+    string,
+    { count: number; p50: number | null; p95: number | null; p99: number | null; max: number | null }
+  >;
+  recent_spans: {
+    name: string;
+    kind: string;
+    trace_id: string;
+    request_id?: string | null;
+    thread_id?: string | null;
+    run_id?: string | null;
+    status: string;
+    duration_ms: number;
+    error_type?: string | null;
+    attrs?: Record<string, unknown>;
+    ts: number;
+  }[];
+  note: string;
+  durable: {
+    agent_runs_last_hour: number;
+    mcp_calls_last_hour: number;
+    mcp_errors_last_hour: number;
+    recent_runs: {
+      run_id: string;
+      thread_id: string | null;
+      status: string;
+      latency_ms: number | null;
+      is_mock: boolean;
+      created_at: string | null;
+    }[];
+  };
+  viewer: { email: string; role: string };
+}
+
 export interface KbPermissions {
   kb_id: string;
   slug: string;
@@ -593,8 +629,14 @@ export const platform = {
     request<AdminUser>(`/api/v1/admin/users/${id}`, send(t, "PATCH", body)),
   audit: (t: string) => request<AuditRow[]>("/api/v1/admin/audit", get(t)),
   settings: (t: string) => request<SettingsView>("/api/v1/admin/settings", get(t)),
+  observability: (t: string) => request<ObservabilityView>("/api/v1/admin/observability", get(t)),
   createKb: (t: string, body: { slug: string; name: string; description: string; visibility: "public" | "restricted" }) =>
     request<{ id: string; slug: string }>("/api/v1/knowledge-bases", send(t, "POST", body), [201]),
+  deleteKb: (t: string, id: string, confirm_slug: string) =>
+    request<{ status: string; slug: string; documents: number; chunks_removed: number }>(
+      `/api/v1/knowledge-bases/${id}`,
+      send(t, "DELETE", { confirm_slug }),
+    ),
   kbPermissions: (t: string, id: string) => request<KbPermissions>(`/api/v1/knowledge-bases/${id}/permissions`, get(t)),
   putKbPermissions: (t: string, id: string, body: { visibility: string; grants: { user_id: string; permission: string }[] }) =>
     request<KbPermissions>(`/api/v1/knowledge-bases/${id}/permissions`, send(t, "PUT", body)),

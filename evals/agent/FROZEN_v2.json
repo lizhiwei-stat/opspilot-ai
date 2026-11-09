@@ -1,0 +1,29 @@
+{
+  "dataset": "agent_eval_v2",
+  "created": "2026-11-09",
+  "seed": 20261109,
+  "frozen_before_tuning": true,
+  "total": 103,
+  "splits": {
+    "validation": 16,
+    "final_test": 31,
+    "dev": 56
+  },
+  "taxonomy_counts": {
+    "kb_qa": 23,
+    "tool": 6,
+    "multi_tool": 7,
+    "unanswerable": 12,
+    "multi_doc": 6,
+    "service_failure": 7,
+    "ticket_gen": 8,
+    "injection": 8,
+    "permission": 8,
+    "approval_interrupt": 7,
+    "error_code": 5,
+    "multi_turn": 6
+  },
+  "sha256_full": "8cb3d27a2069feeee0a1de4e772fcaaefc00b1ec67e7e11f2a90b8fba0c1bba9",
+  "sha256_final_test": "ea92834e972c0604790dd45594d3f20c691e3a16c727eb4b6d16d4b5667b2c10",
+  "disclaimer": "Mock eval measures graph/guards/tools/approvals — NOT real model reasoning. Final_test frozen before Stage 6 tuning."
+}

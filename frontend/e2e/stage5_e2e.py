@@ -334,7 +334,17 @@ def main() -> int:
         expect(dlg).to_contain_text("删除文档")
         dlg.get_by_role("button", name="删除").click()
         expect(page.get_by_label("documents")).to_contain_text("已删除", timeout=T)
-        R.checks["destructive_confirm_cleanup"] = f"{tag}.md deleted after confirm"
+        page.get_by_role("tab", name="知识库与权限").click()
+        page.get_by_label("kb-manage-list").get_by_role("button").filter(
+            has_text=slug
+        ).first.click()
+        page.get_by_label("确认 slug").fill(slug)
+        page.get_by_role("button", name="删除此知识库").click()
+        dlg2 = page.get_by_role("alertdialog")
+        expect(dlg2).to_contain_text("确认删除知识库")
+        dlg2.get_by_role("button", name="确认删除").click()
+        expect(page.get_by_label("kb-manage-list")).not_to_contain_text(slug, timeout=T)
+        R.checks["destructive_confirm_cleanup"] = f"{tag}.md + KB {slug} deleted after confirm"
         browser.close()
 
     allowed = ("401", "403", "Failed to load resource")

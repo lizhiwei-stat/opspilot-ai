@@ -46,6 +46,7 @@ from opspilot.agent.tools import (
 )
 from opspilot.core.config import Settings
 from opspilot.core.redact import redact
+from opspilot.core.tracing import record_span
 from opspilot.db.models import McpToolAudit
 from opspilot.mcp.identity import META_KEY, CallerError, ReplayCache, args_sha256, verify
 
@@ -192,6 +193,25 @@ class Runtime:
             os._exit(3)  # simulate a dying server process
 
     def _audit(self, tool: str, status: str, t0: float, **kw: Any) -> None:
+        dur = int((time.perf_counter() - t0) * 1000)
+        try:
+            import structlog as _sl
+
+            ctx = _sl.contextvars.get_contextvars()
+            record_span(
+                name=f"mcp.{tool}",
+                kind="mcp",
+                trace_id=ctx.get("trace_id") or "mcp",
+                request_id=ctx.get("request_id"),
+                thread_id=kw.get("thread_id"),
+                run_id=kw.get("run_id"),
+                status=status,
+                duration_ms=dur,
+                error_type=kw.get("error_class"),
+                attrs={"server": self.server, "tool": tool, "transport": self.transport},
+            )
+        except Exception as exc:  # tracing must not break tools
+            log.debug("mcp_span_emit_failed", error=type(exc).__name__)
         try:
             with self.sf() as s:
                 uid = kw.pop("user_id", None)
@@ -202,7 +222,7 @@ class Runtime:
                         tool=tool,
                         transport=self.transport,
                         status=status,
-                        duration_ms=int((time.perf_counter() - t0) * 1000),
+                        duration_ms=dur,
                         user_id=uuid.UUID(uid) if uid else None,
                         error=redact(str(kw.pop("error", "") or ""))[:500] or None,
                         **{k: v for k, v in kw.items() if v is not None},

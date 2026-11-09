@@ -24,6 +24,7 @@ from opspilot.agent.llm import AgentLLM, build_agent_llm
 from opspilot.core.config import Settings
 from opspilot.core.errors import ConflictError, ForbiddenError, NotFoundError
 from opspilot.core.logging import get_logger
+from opspilot.core.tracing import bind_trace, record_span
 from opspilot.db.models import AgentEvent, AgentRun, AgentStep, TicketDraft, ToolCall, User
 
 log = get_logger()
@@ -146,6 +147,7 @@ class AgentService:
     def _invoke(self, run_id: uuid.UUID, thread_id: str, payload: Any) -> None:
         t0 = time.perf_counter()
         err = None
+        tid = bind_trace(thread_id=thread_id, run_id=str(run_id))
         self._active.add(run_id)
         try:
             for chunk in self.graph.stream(payload, self._cfg(thread_id), stream_mode="updates"):
@@ -162,13 +164,25 @@ class AgentService:
         finally:
             self._cancel.discard(run_id)
             self._active.discard(run_id)
+        ms = (time.perf_counter() - t0) * 1000
         try:
-            self._persist(run_id, thread_id, (time.perf_counter() - t0) * 1000, err)
+            self._persist(run_id, thread_id, ms, err)
         finally:
             with self.sf() as sess:
                 r = sess.get(AgentRun, run_id)
                 st, e = (r.status, r.error) if r else ("failed", err)
             self._emit(run_id, "final", {"status": st, "error": e})
+            record_span(
+                name="agent.run",
+                kind="agent",
+                trace_id=tid,
+                thread_id=thread_id,
+                run_id=str(run_id),
+                status=st or "failed",
+                duration_ms=round(ms, 2),
+                error_type=(e.split(":", 1)[0] if e else None),
+                attrs={"error": e},
+            )
 
     def _dispatch(self, run_id: uuid.UUID, thread_id: str, payload: Any, background: bool) -> None:
         if not background:

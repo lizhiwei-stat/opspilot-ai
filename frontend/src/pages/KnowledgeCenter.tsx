@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { type KbPermissions, api, platform, rag } from "../api";
-import { Badge, Card, ConfirmDialog, EmptyState, ErrorText, Field, Loading, PageHeader, Tabs, btn, btnPrimary, input, select } from "../components/ui";
+import { Badge, Card, ConfirmDialog, EmptyState, ErrorText, Field, Loading, PageHeader, Tabs, btn, btnDanger, btnPrimary, input, select } from "../components/ui";
 import { errText } from "../errors";
 import { useAsync } from "../lib/hooks";
 import { navigate } from "../lib/router";
@@ -77,7 +77,7 @@ function Manage({ onChanged }: { onChanged: () => void }) {
           </ul>
         </Card>
       </div>
-      {kbId ? <PermissionEditor kbId={kbId} onSaved={() => void kbs.reload()} /> : <EmptyState title="选择知识库管理权限" hint="仅知识库所有者、KB 管理员或系统管理员可修改" />}
+      {kbId ? <PermissionEditor kbId={kbId} onSaved={() => void kbs.reload()} onDeleted={() => { setKbId(null); void kbs.reload(); onChanged(); }} /> : <EmptyState title="选择知识库管理权限" hint="仅知识库所有者、KB 管理员或系统管理员可修改" />}
     </div>
   );
 }
@@ -133,7 +133,7 @@ function CreateKb({ onCreated }: { onCreated: (id: string) => void }) {
   );
 }
 
-function PermissionEditor({ kbId, onSaved }: { kbId: string; onSaved: () => void }) {
+function PermissionEditor({ kbId, onSaved, onDeleted }: { kbId: string; onSaved: () => void; onDeleted: () => void }) {
   const { token } = useAuth();
   const perms = useAsync(() => platform.kbPermissions(token, kbId), [token, kbId]);
   const dir = useAsync(() => platform.directory(token), [token]);
@@ -142,6 +142,9 @@ function PermissionEditor({ kbId, onSaved }: { kbId: string; onSaved: () => void
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
+  const [delOpen, setDelOpen] = useState(false);
+  const [delSlug, setDelSlug] = useState("");
+  const [delBusy, setDelBusy] = useState(false);
   useEffect(() => setDraft(perms.data), [perms.data]);
 
   if (perms.error) return <ErrorText error={perms.error} />;
@@ -241,7 +244,49 @@ function PermissionEditor({ kbId, onSaved }: { kbId: string; onSaved: () => void
         <button className={btnPrimary} onClick={() => (removed.length ? setConfirm(true) : void save())}>
           保存权限
         </button>
+        <div className="mt-6 rounded-lg border border-rose-200 bg-rose-50 p-3" aria-label="删除知识库">
+          <p className="text-sm font-medium text-rose-800">删除知识库</p>
+          <p className="mt-1 text-xs text-rose-700">不可恢复：将软删除全部文档并移除分块与授权。请输入 slug <code className="font-mono">{draft.slug}</code> 确认。</p>
+          <input
+            aria-label="确认 slug"
+            className={`${input} mt-2 w-full`}
+            value={delSlug}
+            placeholder={draft.slug}
+            onChange={(e) => setDelSlug(e.target.value)}
+          />
+          <button
+            type="button"
+            className={`${btnDanger} mt-2`}
+            disabled={delSlug !== draft.slug || delBusy}
+            onClick={() => setDelOpen(true)}
+          >
+            删除此知识库
+          </button>
+        </div>
       </div>
+      <ConfirmDialog
+        open={delOpen}
+        title="确认删除知识库"
+        body={`将永久删除知识库 ${draft.slug} 及其文档分块。此操作不可撤销。`}
+        confirmText="确认删除"
+        danger
+        onCancel={() => setDelOpen(false)}
+        onConfirm={() => {
+          void (async () => {
+            setDelBusy(true);
+            setDelOpen(false);
+            setError(null);
+            try {
+              await platform.deleteKb(token, kbId, draft.slug);
+              onDeleted();
+            } catch (e) {
+              setError(errText(e));
+            } finally {
+              setDelBusy(false);
+            }
+          })();
+        }}
+      />
       <ConfirmDialog
         open={confirm}
         title="撤销访问权限"

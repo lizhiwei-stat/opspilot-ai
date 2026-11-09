@@ -38,8 +38,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import structlog
+
 from opspilot.core.config import Settings
 from opspilot.core.redact import redact
+from opspilot.core.tracing import record_span
 from opspilot.llm.base import ChatMessage, ChatResult, EmbeddingProvider, LLMProvider
 
 PAID_PROVIDERS = frozenset({"openai_compatible"})
@@ -281,12 +284,44 @@ class ModelGateway:
         temperature: float = 0.0,
     ) -> ChatResult:
         self._count(llm.name, "chat")
+        t0 = time.perf_counter()
+        ctx = structlog.contextvars.get_contextvars()
+        tid = ctx.get("trace_id") or "nogateway"
         if llm.name not in PAID_PROVIDERS:
-            return llm.chat(messages, temperature=temperature, max_tokens=max_tokens)
+            try:
+                out = llm.chat(messages, temperature=temperature, max_tokens=max_tokens)
+            except Exception as exc:
+                record_span(
+                    name="model.chat",
+                    kind="model",
+                    trace_id=tid,
+                    request_id=ctx.get("request_id"),
+                    status="error",
+                    duration_ms=round((time.perf_counter() - t0) * 1e3, 1),
+                    error_type=type(exc).__name__,
+                    attrs={"provider": llm.name, "model": llm.model, "paid": False},
+                )
+                raise
+            record_span(
+                name="model.chat",
+                kind="model",
+                trace_id=tid,
+                request_id=ctx.get("request_id"),
+                status="ok",
+                duration_ms=round((time.perf_counter() - t0) * 1e3, 1),
+                attrs={
+                    "provider": llm.name,
+                    "model": llm.model,
+                    "paid": False,
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "estimated_cost_cny": 0,
+                },
+            )
+            return out
         est_in = sum(len(m.content) for m in messages)
         max_tokens = self.clamp_output(max_tokens)
         est = self._authorize(llm.model, est_in, max_tokens)
-        t0 = time.perf_counter()
         rec: dict[str, Any] = {"provider": llm.name, "model": llm.model, "kind": "chat"}
         try:
             out = llm.chat(messages, temperature=temperature, max_tokens=max_tokens)
@@ -304,10 +339,27 @@ class ModelGateway:
                     "latency_ms": round((time.perf_counter() - t0) * 1e3, 1),
                 },
             )
+            record_span(
+                name="model.chat",
+                kind="model",
+                trace_id=tid,
+                request_id=ctx.get("request_id"),
+                status="error",
+                duration_ms=round((time.perf_counter() - t0) * 1e3, 1),
+                error_type=type(exc).__name__,
+                attrs={
+                    "provider": llm.name,
+                    "model": llm.model,
+                    "paid": True,
+                    "estimated_cost_cny": est,
+                },
+            )
             raise
         has = out.usage.total_tokens > 0
         tin = out.usage.prompt_tokens if has else est_in
         tout = out.usage.completion_tokens if has else max_tokens
+        cost = round(self.prices.cost(llm.model, tin, tout), 8)
+        latency = round((time.perf_counter() - t0) * 1e3, 1)
         self._book(
             reserved=est,
             rec={
@@ -316,8 +368,25 @@ class ModelGateway:
                 "tokens_in": tin,
                 "tokens_out": tout,
                 "usage_source": "api" if has else "estimate",
-                "cost_cny": round(self.prices.cost(llm.model, tin, tout), 8),
-                "latency_ms": round((time.perf_counter() - t0) * 1e3, 1),
+                "cost_cny": cost,
+                "latency_ms": latency,
+            },
+        )
+        record_span(
+            name="model.chat",
+            kind="model",
+            trace_id=tid,
+            request_id=ctx.get("request_id"),
+            status="ok",
+            duration_ms=latency,
+            attrs={
+                "provider": llm.name,
+                "model": llm.model,
+                "paid": True,
+                "prompt_tokens": tin,
+                "completion_tokens": tout,
+                "estimated_cost_cny": cost,
+                "actual_cost_cny": cost,
             },
         )
         return out
