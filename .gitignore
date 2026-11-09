@@ -14,3 +14,14 @@ data/uploads/
 **/data/uploads/
 evals/results/*.tmp
 evals/results/latest_*.json
+
+# Stage 7 hygiene
+*.egg-info/
+.coverage
+htmlcov/
+.mypy_cache/
+.turbo/
+frontend/playwright-report/
+frontend/test-results/
+data/backups/
+*.bundle
