@@ -1,0 +1,28 @@
+flowchart TB
+  subgraph Client["Browser (localhost)"]
+    UI["React SPA\nVite / nginx"]
+  end
+  subgraph API["FastAPI backend"]
+    Auth["JWT + RBAC"]
+    RAG["RAG: parse / chunk / embed\nvector+keyword+RRF+rerank"]
+    Agent["LangGraph Agent\nPostgresSaver"]
+    MCP["MCP client\nstdio servers"]
+    Obs["structlog + trace_id\n/metrics + admin observability"]
+  end
+  subgraph Data["PostgreSQL + pgvector"]
+    DB[(KB / tickets / runs\nagent_events / audits)]
+  end
+  subgraph Tools["MCP Servers"]
+    K["opspilot-knowledge"]
+    T["opspilot-ticket"]
+    D["opspilot-diagnostics"]
+  end
+  UI -->|/api| Auth
+  Auth --> RAG
+  Auth --> Agent
+  Agent --> MCP
+  MCP --> K & T & D
+  RAG --> DB
+  Agent --> DB
+  MCP --> DB
+  Auth --> Obs

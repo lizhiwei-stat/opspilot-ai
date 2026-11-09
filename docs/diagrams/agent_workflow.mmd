@@ -1,0 +1,15 @@
+flowchart LR
+  U[User question] --> G[guard_in]
+  G --> C[classify]
+  C --> P[plan]
+  P --> Tools[MCP tools:\nsearch / logs / error / status / draft]
+  Tools --> E[evidence assess]
+  E -->|insufficient| Refuse[refuse]
+  E -->|ok| Gen[generate answer]
+  Gen --> V[verify / citations]
+  V --> Draft{ticket draft?}
+  Draft -->|yes| IRQ[interrupt: await approval]
+  IRQ -->|admin approve| Resume[resume + Ticket MCP]
+  IRQ -->|reject / return| Revise[revise or abort]
+  Draft -->|no| Done[completed]
+  Resume --> Done
