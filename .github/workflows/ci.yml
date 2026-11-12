@@ -24,7 +24,8 @@ jobs:
       OPSPILOT_ALLOW_PAID_API: "false"
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      # setup-uv has no floating major tag v10 (404); latest release is v10.3.3
+      - uses: astral-sh/setup-uv@v10.3.3
         with: { version: "0.13.5" }
       - run: uv sync --frozen -p 3.11 --group dev
       - run: uv run ruff check . && uv run ruff format --check .
