@@ -27,7 +27,9 @@ _TICKET_ACTION = re.compile(
 )
 _TICKET_QUERY = re.compile(r"(查|查看|看看|进展|状态).{0,6}(工单)|工单.{0,6}(进展|状态)")
 _CHITCHAT = re.compile(r"^(你好|您好|hi|hello|谢谢|多谢|早上好|晚上好)[!！。.\s]*$", re.I)
-_OUT_OF_SCOPE = re.compile(r"天气|股票|股价|彩票|写(一首)?诗|讲个笑话|菜谱|足球|火星|员工绩效|绩效评级")
+_OUT_OF_SCOPE = re.compile(
+    r"天气|股票|股价|彩票|写(一首)?诗|讲个笑话|菜谱|足球|火星|员工绩效|绩效评级"
+)
 
 SERVICES = {
     "order-service": ("订单", "order"),

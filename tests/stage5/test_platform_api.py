@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 
 from opspilot import STAGE
-
 from tests.stage5.conftest import login
 
 STRONG = "Passw0rd-" + "x" * 4

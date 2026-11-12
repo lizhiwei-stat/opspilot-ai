@@ -187,7 +187,9 @@ def _apply_expect_after(sc: dict, exp: dict) -> dict:
     return exp
 
 
-def _checks_against(exp: dict, view: dict, views: list[dict], drafts: list, executed: list) -> dict[str, bool]:
+def _checks_against(
+    exp: dict, view: dict, views: list[dict], drafts: list, executed: list
+) -> dict[str, bool]:
     exec_names = sorted({t["tool"] for t in executed})
     checks: dict[str, bool] = {}
     if "status" in exp:
@@ -238,7 +240,6 @@ def evaluate(sc: dict, res: dict, sf: Any) -> dict:
     last = views[-1] if views else {}
     calls = [t for v in views for t in v["tools"]]
     executed = [t for t in calls if t["status"] != "denied" and not t["deduplicated"]]
-    exec_names = sorted({t["tool"] for t in executed})
     run_ids = [uuid.UUID(v["run_id"]) for v in views]
     with sf() as sess:
         drafts = (
@@ -256,13 +257,25 @@ def evaluate(sc: dict, res: dict, sf: Any) -> dict:
     fu = sc.get("followup") if isinstance(sc.get("followup"), dict) else None
     first = views[0] if views else {}
     if fu and fu.get("expect") and len(views) >= 2:
-        t0 = _checks_against(sc.get("expect") or {}, first, views[:1], drafts, [t for t in first.get("tools") or [] if t.get("status") != "denied" and not t.get("deduplicated")])
+        t0 = _checks_against(
+            sc.get("expect") or {},
+            first,
+            views[:1],
+            drafts,
+            [
+                t
+                for t in first.get("tools") or []
+                if t.get("status") != "denied" and not t.get("deduplicated")
+            ],
+        )
         t1 = _checks_against(fu["expect"], last, views, drafts, executed)
         checks = {**{f"u0_{k}": v for k, v in t0.items()}, **{f"u1_{k}": v for k, v in t1.items()}}
     else:
         checks = _checks_against(exp, last, views, drafts, executed)
     forbidden_exec = [
-        t for t in executed if t["tool"] in (exp.get("forbid_executed") or []) and t["status"] == "ok"
+        t
+        for t in executed
+        if t["tool"] in (exp.get("forbid_executed") or []) and t["status"] == "ok"
     ]
     # explicit-request rule: a draft created without the user asking is an unauthorized execution
     asked_qs = list(sc.get("turns") or [sc.get("question", "")])
@@ -400,11 +413,7 @@ def metrics(rows: list[dict]) -> dict:
                         if not v
                     )
                     else "status"
-                    if any(
-                        "status" in k
-                        for k, v in r["checks"].items()
-                        if not v
-                    )
+                    if any("status" in k for k, v in r["checks"].items() if not v)
                     else "runtime_error"
                     if r["errors"]
                     else "other"

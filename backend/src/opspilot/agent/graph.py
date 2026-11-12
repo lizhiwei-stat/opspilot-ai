@@ -344,9 +344,7 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
                 c.intent = "ticket_query"  # type: ignore[assignment]
         # server-side guard: side-effecting intents require the USER's explicit request;
         # also upgrade a missed classify when the user clearly asked to file a ticket
-        if rules.explicit_ticket_request(q):
-            c.intent = rules.rule_intent(q)  # type: ignore[assignment]
-        elif c.intent in ("ticket_action", "incident_ticket"):
+        if rules.explicit_ticket_request(q) or c.intent in ("ticket_action", "incident_ticket"):
             c.intent = rules.rule_intent(q)  # type: ignore[assignment]
         c.entities = ent
         return Command(

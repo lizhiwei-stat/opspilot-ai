@@ -1,6 +1,7 @@
-from opspilot import STAGE
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
+
+from opspilot import STAGE
 
 
 def test_live(client: TestClient) -> None:
