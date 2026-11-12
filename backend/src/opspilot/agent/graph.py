@@ -342,10 +342,11 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
             ent = {k: list(v) for k, v in last.items()}
             if ent.get("tickets") and c.intent == "knowledge_qa":
                 c.intent = "ticket_query"  # type: ignore[assignment]
-        # server-side guard: a side-effecting intent needs the USER's explicit request
-        if c.intent in ("ticket_action", "incident_ticket") and not rules.explicit_ticket_request(
-            q
-        ):
+        # server-side guard: side-effecting intents require the USER's explicit request;
+        # also upgrade a missed classify when the user clearly asked to file a ticket
+        if rules.explicit_ticket_request(q):
+            c.intent = rules.rule_intent(q)  # type: ignore[assignment]
+        elif c.intent in ("ticket_action", "incident_ticket"):
             c.intent = rules.rule_intent(q)  # type: ignore[assignment]
         c.entities = ent
         return Command(
@@ -404,8 +405,11 @@ def build_graph(deps: AgentDeps, checkpointer: Any = None) -> Any:
         ):
             allowed.append("query_system_logs")
             steps.append({"action": "tool", "tool": "query_system_logs", "reason": "需要日志证据"})
-        if incident:
+        if incident or rules.wants_service_status(state["question"]):
             allowed.append("get_service_status")
+            steps.append(
+                {"action": "tool", "tool": "get_service_status", "reason": "查询服务运行状态"}
+            )
         if intent == "ticket_query" or ent.get("tickets"):
             allowed.append("get_ticket")
             steps.append({"action": "tool", "tool": "get_ticket", "reason": "查询工单"})

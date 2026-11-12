@@ -20,11 +20,14 @@ _LOG_WORDS = re.compile(
 )
 _TROUBLE = re.compile(r"故障|报错|异常|排查|500|5xx|超时|失败|挂了|不可用|告警|错误码")
 _TICKET_ACTION = re.compile(
-    r"(创建|新建|提交|生成|开|提|建)(一个|一张|个|张)?(待审核|待审批|待确认)?的?(工单|ticket)", re.I
+    r"(创建|新建|提交|生成|开|提|建)(一个|一张|个|张)?"
+    r"(?:[^。？?！!，,\n]{0,12})?"
+    r"(待审(?:核|批)?|待确认)?的?(工单|ticket)(?:草稿)?",
+    re.I,
 )
 _TICKET_QUERY = re.compile(r"(查|查看|看看|进展|状态).{0,6}(工单)|工单.{0,6}(进展|状态)")
 _CHITCHAT = re.compile(r"^(你好|您好|hi|hello|谢谢|多谢|早上好|晚上好)[!！。.\s]*$", re.I)
-_OUT_OF_SCOPE = re.compile(r"天气|股票|彩票|写(一首)?诗|讲个笑话|菜谱|足球")
+_OUT_OF_SCOPE = re.compile(r"天气|股票|股价|彩票|写(一首)?诗|讲个笑话|菜谱|足球|火星|员工绩效|绩效评级")
 
 SERVICES = {
     "order-service": ("订单", "order"),
@@ -53,7 +56,23 @@ def wants_logs(text: str) -> bool:
 
 def explicit_ticket_request(text: str) -> bool:
     """Only the user's own message can authorise the draft tool."""
-    return bool(_TICKET_ACTION.search(text))
+    for m in _TICKET_ACTION.finditer(text):
+        prefix = text[max(0, m.start() - 4) : m.start()]
+        if re.search(r"下一轮|下一次|下次|稍后$", prefix):
+            continue  # deferred ("next turn") is not a request on this turn
+        return True
+    return False
+
+
+def wants_service_status(text: str) -> bool:
+    """User is asking for a runtime service status, not a ticket/KB how-to."""
+    if TICKET_NO.search(text) or _TICKET_QUERY.search(text):
+        return False
+    if re.search(r"怎么|如何|怎样|步骤", text):
+        return False  # "如何查看服务状态" is a runbook question, not a live probe
+    if re.search(r"服务状态|运行状态|service status", text, re.I):
+        return True
+    return bool(services_in(text)) and bool(re.search(r"(查|查看|看看).{0,20}状态", text))
 
 
 _INCIDENT = re.compile(r"日志|文档|分析|诊断|排查|根因|关联")
@@ -84,6 +103,8 @@ def rule_intent(text: str) -> str:
 # being asked about (the head term) must exist in the knowledge the user can read; topical
 # similarity alone is not evidence (Stage 2.5 held-out finding: h029/h032/h033/h035/h036).
 _Q_BEFORE = re.compile(r"(多少|几[天个次步台秒分钟小时]?|多久|多长时间|多长|是什么|啥)")
+_Q_VALUE = re.compile(r"(多少|几[天个次步台秒分钟小时]?|多久|多长时间|多长)")
+_Q_WHAT = re.compile(r"(是什么|啥)")
 _Q_AFTER = re.compile(r"(哪家|哪个|哪种|哪款|哪一个)")
 _YESNO = re.compile(r"(可以|能|能否|允许|支持|会)([\u4e00-\u9fff]{1,4})吗")
 _CHOICE = re.compile(r"([A-Za-z\u4e00-\u9fff]{2,12})\s*还是\s*([A-Za-z\u4e00-\u9fff]{2,12})")
@@ -215,8 +236,12 @@ def fact_question(text: str) -> dict[str, object] | None:
     if m:
         h = _head(text[m.end() :], last=False)
         return {"type": "entity", "heads": h} if h else None
-    m = _Q_BEFORE.search(text)
+    m = _Q_VALUE.search(text)
     if m:
         h = _head(text[: m.start()])
         return {"type": "value", "heads": h} if h else None
+    m = _Q_WHAT.search(text)
+    if m:
+        h = _head(text[: m.start()])
+        return {"type": "entity", "heads": h} if h else None
     return None

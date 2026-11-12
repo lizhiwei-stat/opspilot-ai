@@ -164,6 +164,9 @@ class MockAgentLLM:
                 add("query_system_logs", {"service": svc, "level": "ERROR"})
                 if incident:
                     add("get_service_status", {"service": svc})
+        if rules.wants_service_status(question):
+            for svc in (ent.get("services") or [])[:2]:
+                add("get_service_status", {"service": svc})
         for t in ent.get("tickets", []):
             add("get_ticket", {"ticket_number": t})
         if hint.get("intent") == "ticket_action" and not any(

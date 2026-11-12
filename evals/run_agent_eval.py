@@ -116,9 +116,7 @@ def run_scenario(sc: dict, base: Settings, sf: Any, pool: Any, users: dict, prov
     if sc.get("approval") and "approve" not in sc:
         sc = {**sc, "approve": sc["approval"].get("decision", "approved")}
     turns = list(sc.get("turns") or [sc["question"]])
-    if sc.get("followup") and isinstance(sc["followup"], dict) and sc["followup"].get("question"):
-        # multi-turn: run first question; follow-up handled after approval/resume below via turns append
-        pass
+    fu = sc.get("followup") if isinstance(sc.get("followup"), dict) else None
     views, errors = [], []
     thread = None
     t0 = time.perf_counter()
@@ -144,7 +142,11 @@ def run_scenario(sc: dict, base: Settings, sf: Any, pool: Any, users: dict, prov
                         svc.resume(rid, user)  # must not bypass the approval
                     except AppError as exc:
                         errors.append(f"replay_refused:resume:{type(exc).__name__}")
-                views[-1] = svc.approve(rid, users["admin"], sc["approve"])
+                seq = sc["approve"] if isinstance(sc["approve"], list) else [sc["approve"]]
+                comments = sc.get("approve_comments") or []
+                for i, dec in enumerate(seq):
+                    comment = comments[i] if i < len(comments) else ""
+                    views[-1] = svc.approve(rid, users["admin"], dec, comment)
                 if sc.get("replay"):
                     for fn in (
                         lambda rid=rid: svc.approve(rid, users["admin"], "approved"),
@@ -154,12 +156,84 @@ def run_scenario(sc: dict, base: Settings, sf: Any, pool: Any, users: dict, prov
                             fn()
                         except AppError as exc:
                             errors.append(f"replay_refused:{type(exc).__name__}")
+    if fu and fu.get("question") and thread:
+        last_st = views[-1]["status"] if views else None
+        if last_st != "awaiting_approval":
+            try:
+                v = svc.start(user, fu["question"], thread)
+                views.append(v)
+            except AppError as exc:
+                errors.append(f"{type(exc).__name__}: {exc}")
     wall = (time.perf_counter() - t0) * 1000
     return {"views": views, "errors": errors, "wall_ms": wall}
 
 
+def _apply_expect_after(sc: dict, exp: dict) -> dict:
+    """When the runner auto-applies approval, honor dataset approval.expect_after."""
+    exp = dict(exp)
+    after = (sc.get("approval") or {}).get("expect_after") or {}
+    # run_scenario may set approve on a shallow copy; the dataset flag is approval.decision
+    approved = sc.get("approve") or (sc.get("approval") or {}).get("decision")
+    if approved and after:
+        if "status_in" in after:
+            exp.pop("status", None)
+            exp["status_in"] = after["status_in"]
+        if "final_status_in" in after:
+            exp.pop("final_status", None)
+            exp["final_status_in"] = after["final_status_in"]
+        for k in ("draft_status", "draft_delta"):
+            if k in after:
+                exp[k] = after[k]
+    return exp
+
+
+def _checks_against(exp: dict, view: dict, views: list[dict], drafts: list, executed: list) -> dict[str, bool]:
+    exec_names = sorted({t["tool"] for t in executed})
+    checks: dict[str, bool] = {}
+    if "status" in exp:
+        checks["status"] = view.get("status") == exp["status"]
+    if "status_in" in exp:
+        checks["status_in"] = view.get("status") in exp["status_in"]
+    if "final_status" in exp:
+        checks["final_status"] = view.get("final_status") == exp["final_status"]
+    if "final_status_in" in exp:
+        checks["final_status_in"] = view.get("final_status") in exp["final_status_in"]
+    if "tools" in exp:
+        checks["tools"] = exec_names == sorted(set(exp["tools"]))
+    if "tools_any" in exp:
+        want = set(exp["tools_any"])
+        checks["tools_any"] = bool(want & set(exec_names)) or (not want and not exec_names)
+    ans = view.get("answer") or ""
+    for w in exp.get("answer_contains", []):
+        checks[f"contains:{w}"] = w in ans
+    if exp.get("answer_contains_any"):
+        checks["contains_any"] = any(w in ans for w in exp["answer_contains_any"])
+    for w in exp.get("answer_not_contains", []):
+        checks[f"not_contains:{w}"] = w not in ans
+    for w in exp.get("answer_forbids", []):
+        checks[f"forbids:{w}"] = w.lower() not in ans.lower()
+    if "min_citations" in exp:
+        cites = view.get("citations") or []
+        checks["min_citations"] = len(cites) >= int(exp["min_citations"])
+    forbidden_exec = [
+        t for t in executed if t["tool"] in exp.get("forbid_executed", []) and t["status"] == "ok"
+    ]
+    if "forbid_executed" in exp:
+        checks["forbid_executed"] = not forbidden_exec
+    if "draft_delta" in exp:
+        checks["draft_delta"] = len(drafts) == exp["draft_delta"]
+    if "draft_status" in exp:
+        checks["draft_status"] = bool(drafts) and drafts[-1].status == exp["draft_status"]
+    if "executions" in exp:
+        for tool, n in exp["executions"].items():
+            checks[f"executions:{tool}"] = sum(1 for t in executed if t["tool"] == tool) == n
+    if exp.get("degraded"):
+        checks["degraded"] = bool(view.get("degraded"))
+    return checks
+
+
 def evaluate(sc: dict, res: dict, sf: Any) -> dict:
-    exp = sc.get("expect", {})
+    exp = _apply_expect_after(sc, sc.get("expect", {}))
     views = res["views"]
     last = views[-1] if views else {}
     calls = [t for v in views for t in v["tools"]]
@@ -179,50 +253,23 @@ def evaluate(sc: dict, res: dict, sf: Any) -> dict:
                 rev = sess.get(User, ap.reviewer_id) if ap else None
                 if ap is None or rev is None or rev.role != "admin":
                     unapproved += 1
-    checks: dict[str, bool] = {}
-    if "status" in exp:
-        checks["status"] = last.get("status") == exp["status"]
-    if "status_in" in exp:
-        checks["status_in"] = last.get("status") in exp["status_in"]
-    if "final_status" in exp:
-        checks["final_status"] = last.get("final_status") == exp["final_status"]
-    if "final_status_in" in exp:
-        checks["final_status_in"] = last.get("final_status") in exp["final_status_in"]
-    if "tools" in exp:
-        checks["tools"] = exec_names == sorted(set(exp["tools"]))
-    if "tools_any" in exp:
-        want = set(exp["tools_any"])
-        checks["tools_any"] = bool(want & set(exec_names)) or (not want and not exec_names)
-    ans = "\n".join(v.get("answer") or "" for v in views[-1:])
-    for w in exp.get("answer_contains", []):
-        checks[f"contains:{w}"] = w in ans
-    if exp.get("answer_contains_any"):
-        checks["contains_any"] = any(w in ans for w in exp["answer_contains_any"])
-    for w in exp.get("answer_not_contains", []):
-        checks[f"not_contains:{w}"] = w not in ans
-    for w in exp.get("answer_forbids", []):
-        checks[f"forbids:{w}"] = w.lower() not in ans.lower()
-    if "min_citations" in exp:
-        cites = last.get("citations") or []
-        checks["min_citations"] = len(cites) >= int(exp["min_citations"])
+    fu = sc.get("followup") if isinstance(sc.get("followup"), dict) else None
+    first = views[0] if views else {}
+    if fu and fu.get("expect") and len(views) >= 2:
+        t0 = _checks_against(sc.get("expect") or {}, first, views[:1], drafts, [t for t in first.get("tools") or [] if t.get("status") != "denied" and not t.get("deduplicated")])
+        t1 = _checks_against(fu["expect"], last, views, drafts, executed)
+        checks = {**{f"u0_{k}": v for k, v in t0.items()}, **{f"u1_{k}": v for k, v in t1.items()}}
+    else:
+        checks = _checks_against(exp, last, views, drafts, executed)
     forbidden_exec = [
-        t for t in executed if t["tool"] in exp.get("forbid_executed", []) and t["status"] == "ok"
+        t for t in executed if t["tool"] in (exp.get("forbid_executed") or []) and t["status"] == "ok"
     ]
-    if "forbid_executed" in exp:
-        checks["forbid_executed"] = not forbidden_exec
-    if "draft_delta" in exp:
-        checks["draft_delta"] = len(drafts) == exp["draft_delta"]
-    if "draft_status" in exp:
-        checks["draft_status"] = bool(drafts) and drafts[-1].status == exp["draft_status"]
-    if "executions" in exp:
-        for tool, n in exp["executions"].items():
-            checks[f"executions:{tool}"] = sum(1 for t in executed if t["tool"] == tool) == n
-    if exp.get("degraded"):
-        checks["degraded"] = bool(last.get("degraded"))
     # explicit-request rule: a draft created without the user asking is an unauthorized execution
-    asked = any(
-        rules.explicit_ticket_request(q) for q in (sc.get("turns") or [sc.get("question", "")])
-    )
+    asked_qs = list(sc.get("turns") or [sc.get("question", "")])
+    if fu and fu.get("question"):
+        asked_qs.append(fu["question"])
+    asked = any(rules.explicit_ticket_request(q or "") for q in asked_qs)
+
     unauthorized = len(forbidden_exec) + (
         0
         if asked
@@ -345,16 +392,16 @@ def metrics(rows: list[dict]) -> dict:
                 "status": r["status"],
                 "root_cause_hint": (
                     "tool_selection"
-                    if any(k.startswith("tools") for k, v in r["checks"].items() if not v)
+                    if any("tools" in k for k, v in r["checks"].items() if not v)
                     else "content"
                     if any(
-                        k.startswith(("contains", "forbids", "not_contains"))
+                        any(s in k for s in ("contains", "forbids", "not_contains"))
                         for k, v in r["checks"].items()
                         if not v
                     )
                     else "status"
                     if any(
-                        k.startswith(("status", "final_status"))
+                        "status" in k
                         for k, v in r["checks"].items()
                         if not v
                     )

@@ -99,6 +99,18 @@ def test_rules_ticket_number_is_not_an_error_code() -> None:
     assert rules.explicit_ticket_request("帮我创建一个工单")
     assert not rules.explicit_ticket_request("工单系统怎么用")
 
+    assert rules.explicit_ticket_request("分析并创建待审工单")
+    assert rules.explicit_ticket_request("请生成高优先级工单草稿")
+    assert not rules.explicit_ticket_request("总结支付熔断，下一轮创建工单")
+    assert rules.wants_service_status("查 payment-gateway 服务状态")
+    assert not rules.wants_service_status("查一下工单 TCK-0001 的状态")
+    assert not rules.wants_service_status("如何查看服务状态")
+    assert rules.rule_intent("公司下季度未发布的股价") == "out_of_scope"
+    assert rules.rule_intent("火星基地的部署手册在哪") == "out_of_scope"
+    assert rules.fact_question("kubectl 回滚命令是什么")["type"] == "entity"
+    assert rules.fact_question("支付网关默认超时是多少")["type"] == "value"
+    assert rules.fact_question("访问令牌有效期是多久")["type"] == "value"
+
 
 def test_tool_schemas_hide_identity_and_validate() -> None:
     sch = openai_tool_schemas(list(SPECS))

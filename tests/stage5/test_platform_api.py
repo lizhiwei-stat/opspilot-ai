@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import uuid
 
+from opspilot import STAGE
+
 from tests.stage5.conftest import login
 
 STRONG = "Passw0rd-" + "x" * 4
@@ -177,7 +179,7 @@ def test_settings_never_returns_secrets(api) -> None:
     j = s.json()
     assert isinstance(j["models"]["api_key_configured"], bool)
     assert "llm_api_key" not in s.text and "jwt_secret" not in s.text and "password" not in s.text
-    assert j["budget"]["allow_paid_api"] is False and j["stage"] == 6
+    assert j["budget"]["allow_paid_api"] is False and j["stage"] == STAGE
     assert j["health"]["status"] in ("ready", "not_ready")
     assert api.get("/api/v1/admin/settings", headers=login(api, "alice")).status_code == 403
 

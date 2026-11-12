@@ -1,3 +1,4 @@
+from opspilot import STAGE
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -32,7 +33,7 @@ def test_ready_all_checks_pass(client: TestClient) -> None:
 
 def test_version(client: TestClient) -> None:
     body = client.get("/api/v1/system/version").json()
-    assert body["stage"] == 6 and body["llm_provider"] == "mock"
+    assert body["stage"] == STAGE and body["llm_provider"] == "mock"
     assert body["embedding_dim"] == 1024
 
 
